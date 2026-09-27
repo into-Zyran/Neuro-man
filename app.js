@@ -85,7 +85,7 @@ const CHAMPION_WEIGHTS = (() => {
 const canvas      = document.getElementById('game-canvas');
 const ctx         = canvas.getContext('2d');
 const nnCanvas    = document.getElementById('nn-canvas');
-const nnCtx       = nnCanvas.getContext('2d');
+const nnCtx       = nnCanvas ? nnCanvas.getContext('2d') : null;
 const overlay     = document.getElementById('canvas-overlay');
 const overlayTitle= document.getElementById('overlay-title');
 const overlaySub  = document.getElementById('overlay-sub');
@@ -168,6 +168,7 @@ const humanPlayer = {
   deathTimer: 0,
   lives: 3,
   score: 0,
+  color: '#ffe600',
   pelletsEaten: new Uint8Array(Engine.COLS * Engine.ROWS),
   energizersEaten: new Uint8Array(Engine.COLS * Engine.ROWS),
   pelletsCount: 0,
@@ -183,6 +184,7 @@ const humanPlayer = {
     this.alive = true;
     this.isDying = false;
     this.deathTimer = 0;
+    this.color = (typeof currentSkinColor !== 'undefined' ? currentSkinColor : '#ffe600');
     if (full) {
       this.lives = 3;
       this.score = 0;
@@ -230,6 +232,7 @@ const MAX_LOG_LINES = 90;
 let logLines = [];
 
 function log(msg, cls = '') {
+  if (!logEl) return;
   const ts  = new Date().toLocaleTimeString('en-GB', { hour12: false });
   const line = `<span class="log-timestamp">[${ts}]</span> <span class="${cls}">${msg}</span>`;
   logLines.push(line);
@@ -443,6 +446,7 @@ function warpGenerations(n = 10) {
 // ─────────────────────────────────────────────
 
 function drawNNViz(leader) {
+  if (!nnCanvas || !nnCtx) return;
   const W = nnCanvas.width, H = nnCanvas.height;
   nnCtx.clearRect(0, 0, W, H);
   nnCtx.fillStyle = '#030810';
@@ -516,24 +520,42 @@ function updateHUD(sensors) {
   if (hudThrottle % 4 !== 0) return;
 
   if (activeMode === 'arcade') {
-    if (elGen)   elGen.textContent   = humanPlayer.score.toFixed(1);
+    const shieldsLeft = window.ArcadeMode ? window.ArcadeMode.getShieldsLeft() : 3;
+    const strikes = window.ArcadeMode ? window.ArcadeMode.getBarrierStrikes() : 0;
+    const warps = window.ArcadeMode ? window.ArcadeMode.getTeleportCharges() : 0;
+    if (elGen)   elGen.textContent   = isVictory ? '100.0' : humanPlayer.score.toFixed(1);
     if (elAlive) elAlive.textContent = '🟡 '.repeat(Math.max(0, humanPlayer.lives)) || '💀';
-    if (elBest)  elBest.textContent  = `${ghosts.length} 👻`;
+    if (elBest)  elBest.textContent  = warps > 0 ? `⚡x${shieldsLeft} 🌀x${warps}` : '⚡ '.repeat(shieldsLeft) || '❌';
     if (elFps)   elFps.textContent   = fpsDisplay > 0 ? fpsDisplay : '--';
+
+    const warpPill = document.getElementById('warp-gauge-pill');
+    const warpInd  = document.getElementById('warp-gauge-indicator');
+    const warpLbl  = document.getElementById('warp-gauge-label');
+    if (warpPill && warpInd && warpLbl) {
+      if (warps > 0) {
+        warpPill.classList.add('charged');
+        warpInd.style.width = '100%';
+        warpLbl.textContent = warps > 1 ? `[T] WARP x${warps}` : 'READY [T]';
+      } else {
+        warpPill.classList.remove('charged');
+        warpInd.style.width = '0%';
+        warpLbl.textContent = 'EMPTY';
+      }
+    }
 
     if (elMGen)     elMGen.textContent     = 'ARCADE';
     if (elMTimer)   elMTimer.textContent   = humanPlayer.score.toFixed(1) + ' / 100';
     if (elMAlive)   elMAlive.textContent   = humanPlayer.lives + ' / 3';
-    if (elMStag)    elMStag.textContent    = (window.ArcadeMode ? window.ArcadeMode.getTrapKills() : humanPlayer.ghostsEatenCount) + ' killed';
+    if (elMStag)    elMStag.textContent    = strikes + ' / 3 strikes';
     if (elMLeader)  elMLeader.textContent  = humanPlayer.score.toFixed(1);
-    if (elMAvg)     elMAvg.textContent     = humanPlayer.pelletsCount;
+    if (elMAvg)     elMAvg.textContent     = warps > 0 ? `${warps} READY [T]` : 'EAT 🔵 POINT';
     if (elMAlltime) elMAlltime.textContent = allTimeBest.toFixed(1);
-    if (elMPellets) elMPellets.textContent = humanPlayer.pelletsCount;
-    if (elMMutrate) elMMutrate.textContent = 'TRAP ARENA';
-    if (elMGhosts)  elMGhosts.textContent  = `${ghosts.length} REMAINING`;
+    if (elMPellets) elMPellets.textContent = (humanPlayer.pelletsCount + (humanPlayer.energizersCount || 0)) + ' / ' + (Engine.TOTAL_POINTS || (Engine.TOTAL_PELLETS + 4));
+    if (elMMutrate) elMMutrate.textContent = warps > 0 ? 'WARP [T] READY' : 'NO WARP';
+    if (elMGhosts)  elMGhosts.textContent  = `${ghosts.length} SLOW`;
     if (elMMode) {
-      elMMode.textContent = 'TRAP RUN';
-      elMMode.className   = 'metric-val mode-champion';
+      elMMode.textContent = warps > 0 ? 'WARP READY' : 'EXPANDED';
+      elMMode.className   = warps > 0 ? 'metric-val mode-champion' : 'metric-val mode-training';
     }
   } else if (activeMode === 'duel') {
     if (elGen)   elGen.textContent   = Math.max(0, (duelTimer / 60)).toFixed(1) + 's';
@@ -607,6 +629,202 @@ function updateHUD(sensors) {
 }
 
 // ─────────────────────────────────────────────
+// TACTICAL FX: SCREEN SHAKE, COMBO & STATS
+// ─────────────────────────────────────────────
+let pelletCombo = 0;
+let lastPelletTime = 0;
+let comboBadgeTimer = null;
+let allTimeHighScore = parseFloat(localStorage.getItem('foldspace_highscore') || localStorage.getItem('error429_highscore') || '0');
+
+function triggerScreenShake() {
+  const wrapper = document.getElementById('canvas-wrapper');
+  const toggle = document.getElementById('toggle-shake');
+  if (!wrapper || (toggle && !toggle.checked)) return;
+  wrapper.classList.remove('screen-shake');
+  void wrapper.offsetWidth;
+  wrapper.classList.add('screen-shake');
+  setTimeout(() => wrapper.classList.remove('screen-shake'), 240);
+}
+
+function updateMenuHighScore() {
+  const el = document.getElementById('val-menu-highscore');
+  if (el) el.textContent = allTimeHighScore.toFixed(1);
+}
+
+function populateDebriefingTable() {
+  if (window.ArcadeMode) {
+    const stats = window.ArcadeMode.getRunStats(humanPlayer);
+    const dPellets = document.getElementById('deb-pellets');
+    const dTime = document.getElementById('deb-time');
+    const dWarps = document.getElementById('deb-warps');
+    const dStrikes = document.getElementById('deb-strikes');
+    if (dPellets) dPellets.textContent = `${stats.pelletsEaten} / ${stats.totalPellets}`;
+    if (dTime) dTime.textContent = stats.timeSurvivedStr;
+    if (dWarps) dWarps.textContent = stats.warpsUsed;
+    if (dStrikes) dStrikes.textContent = `${stats.barrierStrikes} / ${stats.maxStrikes}`;
+  }
+  if (humanPlayer.score > allTimeHighScore) {
+    allTimeHighScore = humanPlayer.score;
+    localStorage.setItem('foldspace_highscore', allTimeHighScore.toString());
+    updateMenuHighScore();
+  }
+}
+
+// ─────────────────────────────────────────────
+// 10B. VICTORY SYSTEM & CELEBRATORY VISUALS
+// ─────────────────────────────────────────────
+
+let isVictory = false;
+let victoryConfetti = [];
+
+function getRemainingPointsCount() {
+  let remainingPellets = 0;
+  let remainingEnergizers = 0;
+  for (let i = 0; i < Engine.COLS * Engine.ROWS; i++) {
+    if (Engine.BASE_PELLETS[i] && !humanPlayer.pelletsEaten[i]) remainingPellets++;
+    if (Engine.BASE_ENERGIZERS[i] && !humanPlayer.energizersEaten[i]) remainingEnergizers++;
+  }
+  return {
+    pellets: remainingPellets,
+    energizers: remainingEnergizers,
+    total: remainingPellets + remainingEnergizers
+  };
+}
+
+function spawnVictoryConfetti() {
+  victoryConfetti = [];
+  const colors = ['#00f7ff', '#ffe600', '#00ff88', '#ff0055', '#ff9900', '#ffffff'];
+  const px = humanPlayer.col * Engine.TILE + Engine.TILE / 2;
+  const py = humanPlayer.row * Engine.TILE + Engine.TILE / 2;
+
+  // Massive radial burst from player position
+  for (let i = 0; i < 90; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 7;
+    victoryConfetti.push({
+      x: px,
+      y: py,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3.0,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 2.5 + Math.random() * 4,
+      alpha: 1.0,
+      decay: 0.006 + Math.random() * 0.007,
+      gravity: 0.12
+    });
+  }
+}
+
+function updateVictoryConfetti() {
+  for (let i = victoryConfetti.length - 1; i >= 0; i--) {
+    const p = victoryConfetti[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.gravity;
+    p.vx *= 0.98;
+    p.alpha -= p.decay;
+    if (p.alpha <= 0) victoryConfetti.splice(i, 1);
+  }
+  // Continually rain down festive sparkles from the top of the canvas
+  if (Math.random() < 0.35 && victoryConfetti.length < 130) {
+    const colors = ['#00f7ff', '#ffe600', '#00ff88', '#ff0055', '#ffffff'];
+    victoryConfetti.push({
+      x: Math.random() * Engine.MAP_W,
+      y: -6,
+      vx: (Math.random() - 0.5) * 2,
+      vy: 1.8 + Math.random() * 3.2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: 2 + Math.random() * 3,
+      alpha: 1.0,
+      decay: 0.005 + Math.random() * 0.005,
+      gravity: 0.06
+    });
+  }
+}
+
+function drawVictoryConfetti(ctx) {
+  ctx.save();
+  for (const p of victoryConfetti) {
+    ctx.globalAlpha = Math.max(0, p.alpha);
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function triggerVictory() {
+  if (isVictory) return;
+  isVictory = true;
+  humanPlayer.alive = false; // Freeze protagonist and shield from ghost attacks
+  humanPlayer.isDying = false;
+  humanPlayer.score = 100.0;
+
+  // Sound effects & fanfare
+  if (window.ArcadeMode && typeof window.ArcadeMode.playVictoryFanfare === 'function') {
+    window.ArcadeMode.playVictoryFanfare();
+  }
+  if (window.SoundSystem && typeof window.SoundSystem.playWarp === 'function') {
+    window.SoundSystem.playWarp();
+  }
+
+  // Floating text announcement & terminal log
+  addFloatingText('🏆 MAZE CLEARED! VICTORY! 🏆', humanPlayer.col * Engine.TILE + Engine.TILE / 2, humanPlayer.row * Engine.TILE - 12, '#00f7ff');
+  log('🏆 VICTORY ACHIEVED! All points in the maze collected! Perfect Score: 100.0 / 100!', 'log-champion');
+
+  // Spawn celebratory confetti shower
+  spawnVictoryConfetti();
+
+  // Present the Victory Overlay
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    overlayTitle.textContent = 'VICTORY!';
+    overlayTitle.className = 'overlay-title title-victory';
+    overlaySub.innerHTML = `🌟 <strong>MAZE 100% CLEARED!</strong> 🌟<br>All points collected with precision!<br>Perfect Score: <span style="color:#00f7ff;font-weight:bold;">100.0 / 100</span>`;
+    if (overlayBtnResume) overlayBtnResume.style.display = 'none';
+    populateDebriefingTable();
+    if (overlayBtn) {
+      overlayBtn.textContent = 'PLAY AGAIN';
+      overlayBtn.style.display = 'inline-block';
+    }
+  }
+}
+
+function checkMazeCompletion() {
+  if (isVictory) return true;
+  const rem = getRemainingPointsCount();
+  const totalPoints = Engine.TOTAL_POINTS || (Engine.TOTAL_PELLETS + 4);
+  const totalCollected = (humanPlayer.pelletsCount || 0) + (humanPlayer.energizersCount || 0);
+
+  // Victory triggers if:
+  // 1. Zero pellets and energizers remain uneaten (complete clear)
+  // 2. Or zero regular pellets remain
+  // 3. Or total collected points equals or exceeds total points
+  // 4. Or protagonist score reached 100.0
+  if (rem.total === 0 || rem.pellets === 0 || totalCollected >= totalPoints || humanPlayer.score >= 99.95) {
+    triggerVictory();
+    return true;
+  }
+  return false;
+}
+
+// Window exposure for testing
+if (typeof window !== 'undefined') {
+  window.triggerVictory = triggerVictory;
+  window.collectAllPoints = () => {
+    humanPlayer.pelletsEaten.fill(1);
+    humanPlayer.energizersEaten.fill(1);
+    humanPlayer.pelletsCount = Engine.TOTAL_PELLETS;
+    humanPlayer.energizersCount = Engine.TOTAL_ENERGIZERS || 4;
+    humanPlayer.score = 100.0;
+    checkMazeCompletion();
+  };
+}
+
+// ─────────────────────────────────────────────
 // 11.  MAIN GAME LOOP
 // ─────────────────────────────────────────────
 
@@ -627,6 +845,22 @@ function gameLoop(ts) {
   // A.  🕹️ ARCADE MODE (Playable Pac-Man)
   // ─────────────────────────────────────────
   if (activeMode === 'arcade') {
+    // 🏆 VICTORY CELEBRATION LOOP
+    if (isVictory) {
+      updateVictoryConfetti();
+      Engine.drawMap(ctx, humanPlayer.pelletsEaten, humanPlayer.energizersEaten);
+      if (window.ArcadeMode) {
+        window.ArcadeMode.render(ctx);
+      }
+      Engine.drawPlayer(ctx, humanPlayer);
+      drawVictoryConfetti(ctx);
+      Engine.drawFloatingTexts(ctx, floatingTexts);
+      const sensors = getSensors(humanPlayer, ghosts);
+      updateHUD(sensors);
+      lastFrameTime = ts;
+      return;
+    }
+
     if (humanPlayer.isDying) {
       humanPlayer.deathTimer++;
       if (humanPlayer.deathTimer >= 30) {
@@ -634,7 +868,9 @@ function gameLoop(ts) {
           overlay.classList.remove('hidden');
           overlayTitle.textContent = 'GAME OVER';
           overlayTitle.className = 'overlay-title title-gameover';
-          overlaySub.textContent = `FINAL SCORE: ${humanPlayer.score.toFixed(1)} / 100  |  PELLETS: ${humanPlayer.pelletsCount}`;
+          overlaySub.textContent = `FINAL SCORE: ${humanPlayer.score.toFixed(1)} / 100  |  POINTS: ${humanPlayer.pelletsCount} / ${Engine.TOTAL_PELLETS}`;
+          if (overlayBtnResume) overlayBtnResume.style.display = 'none';
+          populateDebriefingTable();
           if (overlayBtn) {
             overlayBtn.textContent = 'PLAY AGAIN';
             overlayBtn.style.display = 'inline-block';
@@ -642,7 +878,8 @@ function gameLoop(ts) {
           return;
         } else {
           humanPlayer.reset(false);
-          ghosts = Engine.createDefaultGhosts();
+          const slowSpeed = window.ArcadeMode ? window.ArcadeMode.getSlowGhostSpeed() : 22;
+          ghosts = Engine.createDefaultGhosts(slowSpeed);
           addFloatingText('READY!', Engine.SPAWN_COL * Engine.TILE + Engine.TILE / 2, Engine.SPAWN_ROW * Engine.TILE, '#ffe600');
         }
       }
@@ -671,30 +908,70 @@ function gameLoop(ts) {
         if (Engine.BASE_PELLETS[pi] && !humanPlayer.pelletsEaten[pi]) {
           humanPlayer.pelletsEaten[pi] = 1;
           humanPlayer.pelletsCount++;
-          const pDelta = 40.0 / Math.max(1, Engine.TOTAL_PELLETS);
+          const pDelta = 60.0 / Math.max(1, Engine.TOTAL_PELLETS);
           humanPlayer.score = Math.min(100.0, humanPlayer.score + pDelta);
+
+          // Combo tracking
+          const now = performance.now();
+          if (now - lastPelletTime < 1400) {
+            pelletCombo++;
+          } else {
+            pelletCombo = 1;
+          }
+          lastPelletTime = now;
+          if (window.SoundSystem) window.SoundSystem.playWaka(pelletCombo);
+
+          if (pelletCombo >= 4) {
+            const comboBadge = document.getElementById('combo-badge');
+            const comboVal = document.getElementById('combo-val');
+            if (comboBadge && comboVal) {
+              comboVal.textContent = pelletCombo;
+              comboBadge.classList.remove('hidden');
+              clearTimeout(comboBadgeTimer);
+              comboBadgeTimer = setTimeout(() => {
+                comboBadge.classList.add('hidden');
+              }, 1200);
+            }
+          }
         }
 
-        // Super Energizer eating (+10.0 pts each)
+        // Super Energizer eating (+10.0 pts each) -> Glowing Blue Point!
         if (Engine.BASE_ENERGIZERS[pi] && !humanPlayer.energizersEaten[pi]) {
           humanPlayer.energizersEaten[pi] = 1;
           humanPlayer.energizersCount++;
           humanPlayer.score = Math.min(100.0, humanPlayer.score + 10.0);
-          addFloatingText('+10.0 ⚡', humanPlayer.col * Engine.TILE + Engine.TILE / 2, humanPlayer.row * Engine.TILE - 5, '#00f7ff');
-          log('⚡ SUPER ENERGIZER CONSUMED! +10.0 PTS!', 'log-champion');
+          if (window.ArcadeMode) {
+            window.ArcadeMode.addTeleportCharge();
+          }
+          if (window.SoundSystem) {
+            window.SoundSystem.playWarp();
+          }
+          addFloatingText('🌀 [T] TELEPORT READY! +10.0', humanPlayer.col * Engine.TILE + Engine.TILE / 2, humanPlayer.row * Engine.TILE - 6, '#00f7ff');
+          log('🌀 GLOWING BLUE POINT CONSUMED! Quantum Teleport charged! Press [T] to warp far from ghosts!', 'log-champion');
+        }
+
+        // Instant check: Did this point complete the entire maze?
+        if (checkMazeCompletion()) {
+          return;
         }
       }
 
-      // ⚡ ArcadeMode Electric Hazard Barriers update (ghost traps, player shocks & victory check)
+      // ⚡ ArcadeMode Moving Slow Hazard Barriers (3 strikes = game over, spawns +1 slow ghost, point completion win)
       if (window.ArcadeMode) {
         window.ArcadeMode.update(humanPlayer, ghosts, {
           addFloatingText,
           log,
+          onScreenShake: triggerScreenShake,
           onVictory: () => {
+            triggerVictory();
+          },
+          onBarrierGameOver: () => {
             overlay.classList.remove('hidden');
-            overlayTitle.textContent = 'VICTORY!';
-            overlayTitle.className = 'overlay-title title-victory';
-            overlaySub.textContent = `ALL GHOSTS VAPORIZED! Maze Secured! Score: ${humanPlayer.score.toFixed(1)} / 100`;
+            overlayTitle.textContent = 'GAME OVER';
+            overlayTitle.className = 'overlay-title title-gameover';
+            overlaySub.textContent = `BARRIER OVERLOAD! Touched hazard barriers 3 times! Final Score: ${humanPlayer.score.toFixed(1)} / 100`;
+            if (overlayBtnResume) overlayBtnResume.style.display = 'none';
+            populateDebriefingTable();
             if (overlayBtn) {
               overlayBtn.textContent = 'PLAY AGAIN';
               overlayBtn.style.display = 'inline-block';
@@ -703,8 +980,30 @@ function gameLoop(ts) {
         });
       }
 
+      // If victory was triggered by ArcadeMode, halt immediately before ghost attacks
+      if (isVictory) {
+        return;
+      }
+
       // Ghosts update
       for (const g of ghosts) g.update(humanPlayer);
+
+      // Proximity Threat Vignette Check
+      let minGDist = 999;
+      for (const g of ghosts) {
+        const dx = g.col - humanPlayer.col;
+        const dy = g.row - humanPlayer.row;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < minGDist) minGDist = d;
+      }
+      const threatEl = document.getElementById('threat-vignette');
+      if (threatEl) {
+        if (minGDist <= 3.5 && humanPlayer.alive && !humanPlayer.isDying) {
+          threatEl.classList.remove('hidden');
+        } else {
+          threatEl.classList.add('hidden');
+        }
+      }
 
       // Ghost collisions (contact with ghost costs a life)
       for (const g of ghosts) {
@@ -712,6 +1011,8 @@ function gameLoop(ts) {
           humanPlayer.lives--;
           humanPlayer.isDying = true;
           humanPlayer.deathTimer = 0;
+          triggerScreenShake();
+          if (window.SoundSystem) window.SoundSystem.playDeathSound();
           addFloatingText('OUCH! 💀', humanPlayer.col * Engine.TILE + Engine.TILE / 2, humanPlayer.row * Engine.TILE, '#ff2d55');
           log(`💀 Caught by ${g.type.toUpperCase()}! Lives remaining: ${humanPlayer.lives}`, 'log-death');
           break;
@@ -1055,49 +1356,53 @@ canvas.addEventListener('contextmenu', function (e) {
 // 13.  CONTROL BUTTONS & PUBLIC SIMULATION API
 // ─────────────────────────────────────────────
 
-btnTrain.addEventListener('click', () => {
-  isChampion = false;
-  generation = 1;
-  stagnationCount = 0;
-  lastEpochBest   = 0;
-  allTimeBest     = 0;
-  ghosts          = Engine.createDefaultGhosts();
-  logLines        = [];
-  logEl.innerHTML = '';
+if (btnTrain) {
+  btnTrain.addEventListener('click', () => {
+    isChampion = false;
+    generation = 1;
+    stagnationCount = 0;
+    lastEpochBest   = 0;
+    allTimeBest     = 0;
+    ghosts          = Engine.createDefaultGhosts();
+    logLines        = [];
+    if (logEl) logEl.innerHTML = '';
 
-  const brains = [];
-  for (let i = 0; i < GA.SWARM_SIZE; i++) brains.push(GA.createBrain());
-  spawnSwarm(brains);
+    const brains = [];
+    for (let i = 0; i < GA.SWARM_SIZE; i++) brains.push(GA.createBrain());
+    spawnSwarm(brains);
 
-  log('⚡ LIVE TRAIN mode activated. Weights cleared. Gen 1 chaos begins.', 'log-mutate');
-  updateHUD();
-});
+    log('⚡ LIVE TRAIN mode activated. Weights cleared. Gen 1 chaos begins.', 'log-mutate');
+    updateHUD();
+  });
+}
 
-btnPause.addEventListener('click', () => {
-  paused = !paused;
-  btnPause.innerHTML = paused
-    ? '<span class="btn-icon">&#9654;</span> RESUME'
-    : '<span class="btn-icon">&#9208;</span> PAUSE';
+if (btnPause) {
+  btnPause.addEventListener('click', () => {
+    paused = !paused;
+    btnPause.innerHTML = paused
+      ? '<span class="btn-icon">&#9654;</span> RESUME'
+      : '<span class="btn-icon">&#9208;</span> PAUSE';
 
-  if (paused) {
-    overlay.classList.remove('hidden');
-    overlayTitle.textContent = 'PAUSED';
-    overlaySub.textContent   = 'Press Space or click RESUME';
-  } else {
-    overlay.classList.add('hidden');
-  }
-});
+    if (paused) {
+      overlay.classList.remove('hidden');
+      overlayTitle.textContent = 'PAUSED';
+      overlaySub.textContent   = 'Press Space or click RESUME';
+    } else {
+      overlay.classList.add('hidden');
+    }
+  });
+}
 
-btnSpeed.addEventListener('click', () => {
-  fastMode = !fastMode;
-  speedMult = fastMode ? 4 : 1;
-  btnSpeed.innerHTML = fastMode
-    ? '<span class="btn-icon">&#9193;</span> 4x'
-    : '<span class="btn-icon">&#9193;</span> 1x';
-  log(`Speed set to ${speedMult}x`, '');
-});
-
-
+if (btnSpeed) {
+  btnSpeed.addEventListener('click', () => {
+    fastMode = !fastMode;
+    speedMult = fastMode ? 4 : 1;
+    btnSpeed.innerHTML = fastMode
+      ? '<span class="btn-icon">&#9193;</span> 4x'
+      : '<span class="btn-icon">&#9193;</span> 1x';
+    log(`Speed set to ${speedMult}x`, '');
+  });
+}
 
 // Maze Architect Mode Toggle
 if (btnBarrier) {
@@ -1121,12 +1426,77 @@ if (btnWarp) {
 // 14.  MODE SWITCHER & INTERACTION
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// 14.  SCREEN & MODAL NAVIGATION SYSTEM
+// ─────────────────────────────────────────────
+
+function showScreen(screen) {
+  const scrMenu = document.getElementById('screen-menu');
+  const scrGame = document.getElementById('screen-game');
+  if (screen === 'menu') {
+    if (scrMenu) scrMenu.classList.add('active');
+    if (scrGame) scrGame.classList.remove('active');
+    paused = true;
+    closeAllModals();
+    if (window.SoundSystem) {
+      window.SoundSystem.playMenuMusic();
+    }
+  } else {
+    if (scrMenu) scrMenu.classList.remove('active');
+    if (scrGame) scrGame.classList.add('active');
+    paused = false;
+    closeAllModals();
+    if (window.SoundSystem) {
+      window.SoundSystem.stopMenuMusic();
+    }
+  }
+}
+
+function openDrawer() {
+  const drawer = document.getElementById('drawer-menu');
+  if (drawer) drawer.classList.remove('hidden');
+  paused = true;
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById('drawer-menu');
+  if (drawer) drawer.classList.add('hidden');
+}
+
+function openSettingsModal() {
+  const modal = document.getElementById('modal-settings');
+  if (modal) modal.classList.remove('hidden');
+  paused = true;
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('modal-settings');
+  if (modal) modal.classList.add('hidden');
+}
+
+function openInstructionsModal() {
+  const modal = document.getElementById('modal-instructions');
+  if (modal) modal.classList.remove('hidden');
+  paused = true;
+}
+
+function closeInstructionsModal() {
+  const modal = document.getElementById('modal-instructions');
+  if (modal) modal.classList.add('hidden');
+}
+
+function closeAllModals() {
+  closeDrawer();
+  closeSettingsModal();
+  closeInstructionsModal();
+}
+
 function switchMode(mode) {
   activeMode = mode;
   paused = false;
-  overlay.classList.add('hidden');
-  overlayTitle.className = 'overlay-title';
-  if (overlayBtn) overlayBtn.style.display = 'none';
+  if (overlay) overlay.classList.add('hidden');
+  if (overlayTitle) overlayTitle.className = 'overlay-title';
+  if (overlayBtnResume) overlayBtnResume.style.display = 'block';
   floatingTexts = [];
 
   if (tabArcade) tabArcade.classList.toggle('active', mode === 'arcade');
@@ -1134,14 +1504,17 @@ function switchMode(mode) {
   if (tabSwarm)  tabSwarm.classList.toggle('active', mode === 'swarm');
 
   if (mode === 'arcade') {
+    isVictory = false;
+    victoryConfetti = [];
     if (stat1Lbl) stat1Lbl.textContent = 'SCORE';
     if (stat2Lbl) stat2Lbl.textContent = 'LIVES';
-    if (stat3Lbl) stat3Lbl.textContent = 'GHOSTS';
-    if (canvasHint) canvasHint.textContent = '🕹️ ARCADE: Arrow Keys / WASD · Lure Ghosts into Electric Barriers ⚡ to Vaporize them · Avoid Barriers (bumping spawns +1 Ghost) · Kill All Ghosts to Win!';
+    if (stat3Lbl) stat3Lbl.textContent = 'SHIELDS';
+    if (canvasHint) canvasHint.textContent = '🕹️ ARROWS / WASD = Navigate · Eat 🔵 = Teleport Charge (Press [T] to Warp!) · Dodge Moving Barriers · 5 Wormholes';
     humanPlayer.reset(true);
     if (window.ArcadeMode) window.ArcadeMode.reset();
-    ghosts = Engine.createDefaultGhosts();
-    log('🕹️ ARCADE MODE ACTIVATED! Lure ghosts into Electric Barriers ⚡ to vaporize them! Avoid touching barriers (+1 ghost penalty). Kill all ghosts to win!', 'log-champion');
+    const slowSpeed = window.ArcadeMode ? window.ArcadeMode.getSlowGhostSpeed() : 22;
+    ghosts = Engine.createDefaultGhosts(slowSpeed);
+    log('🕹️ ARCADE MODE: Eat all points! Eat glowing blue points to charge Quantum Warp (Press [T] to teleport far from ghosts!). Avoid moving hazard barriers!', 'log-champion');
   } else if (mode === 'duel') {
     if (stat1Lbl) stat1Lbl.textContent = 'TIME';
     if (stat2Lbl) stat2Lbl.textContent = 'AI FOOD';
@@ -1166,6 +1539,256 @@ function switchMode(mode) {
   updateHUD();
 }
 
+// ─────────────────────────────────────────────
+// PAGE 1: TITLE & MAIN MENU EVENT LISTENERS
+// ─────────────────────────────────────────────
+const btnMenuPlay = document.getElementById('btn-menu-play');
+if (btnMenuPlay) {
+  btnMenuPlay.addEventListener('click', () => {
+    if (window.SoundSystem) {
+      window.SoundSystem.playUiClick();
+      window.SoundSystem.stopMenuMusic(); // Stop music immediately on entering game
+    }
+    showScreen('game');
+    switchMode('arcade');
+  });
+}
+
+// Auto-start menu music on first user interaction with the title menu
+const triggerMenuMusicOnFirstGesture = () => {
+  const scrMenu = document.getElementById('screen-menu');
+  if (scrMenu && scrMenu.classList.contains('active')) {
+    if (window.SoundSystem) {
+      window.SoundSystem.playMenuMusic();
+    }
+  }
+};
+window.addEventListener('pointerdown', triggerMenuMusicOnFirstGesture, { once: true });
+window.addEventListener('keydown', triggerMenuMusicOnFirstGesture, { once: true });
+
+const btnMenuSettings = document.getElementById('btn-menu-settings');
+if (btnMenuSettings) {
+  btnMenuSettings.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    openSettingsModal();
+  });
+}
+
+const btnMenuInstructions = document.getElementById('btn-menu-instructions');
+if (btnMenuInstructions) {
+  btnMenuInstructions.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    openInstructionsModal();
+  });
+}
+
+// ─────────────────────────────────────────────
+// PAGE 2: IN-GAME HEADER & HAMBURGER DRAWER
+// ─────────────────────────────────────────────
+const headerLogo = document.getElementById('header-logo');
+if (headerLogo) {
+  headerLogo.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    showScreen('menu');
+  });
+}
+
+const btnHamburger = document.getElementById('btn-hamburger');
+if (btnHamburger) {
+  btnHamburger.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    openDrawer();
+  });
+}
+
+const btnDrawerClose = document.getElementById('btn-drawer-close');
+if (btnDrawerClose) {
+  btnDrawerClose.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeDrawer();
+    paused = false;
+  });
+}
+
+const btnDrawerResume = document.getElementById('btn-drawer-resume');
+if (btnDrawerResume) {
+  btnDrawerResume.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeDrawer();
+    paused = false;
+    if (overlay) overlay.classList.add('hidden');
+  });
+}
+
+const btnDrawerRestart = document.getElementById('btn-drawer-restart');
+if (btnDrawerRestart) {
+  btnDrawerRestart.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeDrawer();
+    switchMode('arcade');
+  });
+}
+
+const btnDrawerSettings = document.getElementById('btn-drawer-settings');
+if (btnDrawerSettings) {
+  btnDrawerSettings.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeDrawer();
+    openSettingsModal();
+  });
+}
+
+const btnDrawerInstructions = document.getElementById('btn-drawer-instructions');
+if (btnDrawerInstructions) {
+  btnDrawerInstructions.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeDrawer();
+    openInstructionsModal();
+  });
+}
+
+const btnDrawerExit = document.getElementById('btn-drawer-exit');
+if (btnDrawerExit) {
+  btnDrawerExit.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    closeAllModals();
+    showScreen('menu');
+  });
+}
+
+// ─────────────────────────────────────────────
+// CANVAS OVERLAY ACTION BUTTONS
+// ─────────────────────────────────────────────
+const overlayBtnResume = document.getElementById('overlay-btn-resume');
+if (overlayBtnResume) {
+  overlayBtnResume.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    paused = false;
+    if (overlay) overlay.classList.add('hidden');
+  });
+}
+
+const overlayBtnRestart = document.getElementById('overlay-btn-restart');
+if (overlayBtnRestart) {
+  overlayBtnRestart.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    switchMode('arcade');
+  });
+}
+
+const overlayBtnMenu = document.getElementById('overlay-btn-menu');
+if (overlayBtnMenu) {
+  overlayBtnMenu.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    showScreen('menu');
+  });
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS CONTROLS & BARRIER CUSTOMIZATION
+// ─────────────────────────────────────────────
+const toggleMusic = document.getElementById('toggle-music');
+if (toggleMusic) {
+  toggleMusic.addEventListener('change', (e) => {
+    if (window.SoundSystem) {
+      window.SoundSystem.setMusicEnabled(e.target.checked);
+      const scrMenu = document.getElementById('screen-menu');
+      if (scrMenu && scrMenu.classList.contains('active')) {
+        if (e.target.checked) window.SoundSystem.playMenuMusic();
+        else window.SoundSystem.stopMenuMusic();
+      } else {
+        window.SoundSystem.stopMenuMusic();
+      }
+    }
+  });
+}
+
+const toggleSfx = document.getElementById('toggle-sfx');
+if (toggleSfx) {
+  toggleSfx.addEventListener('change', (e) => {
+    if (window.SoundSystem) {
+      window.SoundSystem.setSfxEnabled(e.target.checked);
+      if (e.target.checked) window.SoundSystem.playUiClick();
+    }
+  });
+}
+
+const sliderVolume = document.getElementById('slider-volume');
+const valVolume = document.getElementById('val-volume');
+if (sliderVolume) {
+  sliderVolume.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (valVolume) valVolume.textContent = val + '%';
+    if (window.SoundSystem) {
+      window.SoundSystem.setMasterVolume(val / 100);
+    }
+  });
+}
+
+// Barrier Count Selector
+const barrierOptions = document.querySelectorAll('.barrier-option');
+const valBarriers = document.getElementById('val-barriers');
+barrierOptions.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const count = parseInt(btn.getAttribute('data-count'), 10);
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    if (window.ArcadeMode) {
+      window.ArcadeMode.setBarrierCount(count);
+    }
+    barrierOptions.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (valBarriers) {
+      valBarriers.textContent = `${count} BARRIER${count > 1 ? 'S' : ''}`;
+    }
+  });
+});
+
+const btnSaveSettings = document.getElementById('btn-save-settings');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+[btnSaveSettings, btnCloseSettings].forEach(btn => {
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (window.SoundSystem) window.SoundSystem.playUiClick();
+      closeSettingsModal();
+      const scrGame = document.getElementById('screen-game');
+      if (scrGame && scrGame.classList.contains('active')) {
+        paused = false;
+      }
+    });
+  }
+});
+
+// ─────────────────────────────────────────────
+// INSTRUCTIONS MODAL CONTROLS
+// ─────────────────────────────────────────────
+const btnCloseInstructions = document.getElementById('btn-close-instructions');
+const btnBackInstructions = document.getElementById('btn-back-instructions');
+[btnCloseInstructions, btnBackInstructions].forEach(btn => {
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (window.SoundSystem) window.SoundSystem.playUiClick();
+      closeInstructionsModal();
+      const scrGame = document.getElementById('screen-game');
+      if (scrGame && scrGame.classList.contains('active')) {
+        paused = false;
+      }
+    });
+  }
+});
+
+// Close modals when clicking backdrop outside card
+document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(backdrop => {
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) {
+      closeAllModals();
+      const scrGame = document.getElementById('screen-game');
+      if (scrGame && scrGame.classList.contains('active')) {
+        paused = false;
+      }
+    }
+  });
+});
+
 if (tabArcade) tabArcade.addEventListener('click', () => switchMode('arcade'));
 if (tabDuel)   tabDuel.addEventListener('click', () => switchMode('duel'));
 if (tabSwarm)  tabSwarm.addEventListener('click', () => switchMode('swarm'));
@@ -1175,9 +1798,41 @@ if (overlayBtn) overlayBtn.addEventListener('click', () => {
 
 // Keyboard controls: Space (Pause), R (Restart), B (Barriers), WASD/Arrows
 document.addEventListener('keydown', e => {
+  const scrGame = document.getElementById('screen-game');
+  const inGame = scrGame && scrGame.classList.contains('active');
+  const modalOpen = !document.getElementById('modal-settings')?.classList.contains('hidden') ||
+                    !document.getElementById('modal-instructions')?.classList.contains('hidden') ||
+                    !document.getElementById('drawer-menu')?.classList.contains('hidden');
+
+  if (e.code === 'Escape') {
+    if (modalOpen) {
+      closeAllModals();
+      if (inGame) paused = false;
+      return;
+    } else if (inGame) {
+      openDrawer();
+      return;
+    }
+  }
+
+  if (!inGame || modalOpen) return;
+
   if (e.code === 'Space') {
     e.preventDefault();
-    btnPause.click();
+    if (btnPause) {
+      btnPause.click();
+    } else {
+      paused = !paused;
+      if (paused) {
+        if (overlay) {
+          overlay.classList.remove('hidden');
+          overlayTitle.textContent = 'PAUSED';
+          overlaySub.textContent   = 'Press Space to resume';
+        }
+      } else {
+        if (overlay) overlay.classList.add('hidden');
+      }
+    }
     return;
   }
   if (e.code === 'KeyR') {
@@ -1187,6 +1842,14 @@ document.addEventListener('keydown', e => {
 
   if (e.code === 'KeyB') {
     if (btnBarrier) btnBarrier.click();
+    return;
+  }
+
+  // Quantum Teleportation [Key T] for Arcade Mode
+  if (e.code === 'KeyT') {
+    if (activeMode === 'arcade' && window.ArcadeMode) {
+      window.ArcadeMode.executeTeleport(humanPlayer, ghosts, { addFloatingText, log });
+    }
     return;
   }
 
@@ -1210,6 +1873,169 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ─────────────────────────────────────────────
+// CRT SHADER & SCREEN SHAKE SETTINGS
+// ─────────────────────────────────────────────
+const toggleCrt = document.getElementById('toggle-crt');
+if (toggleCrt) {
+  const savedCrt = (localStorage.getItem('foldspace_crt') || localStorage.getItem('error429_crt')) === 'true';
+  toggleCrt.checked = savedCrt;
+  document.body.classList.toggle('crt-mode', savedCrt);
+  toggleCrt.addEventListener('change', (e) => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    document.body.classList.toggle('crt-mode', e.target.checked);
+    localStorage.setItem('foldspace_crt', e.target.checked);
+  });
+}
+
+const toggleShake = document.getElementById('toggle-shake');
+if (toggleShake) {
+  const savedShake = localStorage.getItem('foldspace_shake') || localStorage.getItem('error429_shake');
+  if (savedShake !== null) {
+    toggleShake.checked = savedShake === 'true';
+  }
+  toggleShake.addEventListener('change', (e) => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    localStorage.setItem('foldspace_shake', e.target.checked);
+  });
+}
+
+// ─────────────────────────────────────────────
+// PROTAGONIST SKIN SELECTOR
+// ─────────────────────────────────────────────
+let currentSkinColor = localStorage.getItem('foldspace_skin') || localStorage.getItem('error429_skin') || '#ffe600';
+humanPlayer.color = currentSkinColor;
+
+const skinBtns = document.querySelectorAll('.skin-btn');
+skinBtns.forEach(btn => {
+  if (btn.getAttribute('data-color') === currentSkinColor) {
+    skinBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  btn.addEventListener('click', () => {
+    if (window.SoundSystem) window.SoundSystem.playUiClick();
+    skinBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSkinColor = btn.getAttribute('data-color') || '#ffe600';
+    humanPlayer.color = currentSkinColor;
+    localStorage.setItem('foldspace_skin', currentSkinColor);
+  });
+});
+
+// ─────────────────────────────────────────────
+// LIVE CYBER GRID & DIGITAL PARTICLES CANVAS
+// ─────────────────────────────────────────────
+function initCyberGridBackground() {
+  const bgCanvas = document.getElementById('bg-canvas');
+  if (!bgCanvas) return;
+  const bgCtx = bgCanvas.getContext('2d');
+  let gridOffset = 0;
+
+  function resizeBg() {
+    bgCanvas.width = window.innerWidth;
+    bgCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeBg);
+  resizeBg();
+
+  const particles = [];
+  for (let i = 0; i < 45; i++) {
+    particles.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      speed: 0.4 + Math.random() * 1.4,
+      size: 1.2 + Math.random() * 2,
+      alpha: 0.2 + Math.random() * 0.6
+    });
+  }
+
+  function drawBg() {
+    const scrMenu = document.getElementById('screen-menu');
+    if (scrMenu && scrMenu.classList.contains('active')) {
+      const w = bgCanvas.width;
+      const h = bgCanvas.height;
+      bgCtx.clearRect(0, 0, w, h);
+
+      // Perspective Cyber Horizon Grid
+      const horizonY = h * 0.45;
+      const centerX = w * 0.5;
+      const numLines = 22;
+
+      // Vertical perspective lines
+      bgCtx.lineWidth = 1;
+      for (let i = -numLines; i <= numLines; i++) {
+        const spread = (i / numLines) * w * 1.8;
+        bgCtx.strokeStyle = 'rgba(0, 247, 255, 0.12)';
+        bgCtx.beginPath();
+        bgCtx.moveTo(centerX, horizonY);
+        bgCtx.lineTo(centerX + spread, h);
+        bgCtx.stroke();
+      }
+
+      // Depth horizontal moving lines
+      gridOffset = (gridOffset + 0.5) % 25;
+      for (let y = horizonY; y < h; y += 6 + (y - horizonY) * 0.09) {
+        const drawY = y + (gridOffset * (y - horizonY) / (h - horizonY));
+        if (drawY > h) continue;
+        const alpha = Math.min(0.24, (drawY - horizonY) / (h - horizonY) * 0.24);
+        bgCtx.strokeStyle = `rgba(0, 247, 255, ${alpha})`;
+        bgCtx.beginPath();
+        bgCtx.moveTo(0, drawY);
+        bgCtx.lineTo(w, drawY);
+        bgCtx.stroke();
+      }
+
+      // Floating digital neon particles
+      for (const p of particles) {
+        p.y += p.speed;
+        if (p.y > h) { p.y = 0; p.x = Math.random() * w; }
+        bgCtx.fillStyle = `rgba(0, 247, 255, ${p.alpha})`;
+        bgCtx.fillRect(p.x, p.y, p.size, p.size);
+      }
+    }
+    requestAnimationFrame(drawBg);
+  }
+  drawBg();
+}
+
+// ─────────────────────────────────────────────
+// MENU AUDIO SPECTRUM VISUALIZER
+// ─────────────────────────────────────────────
+function initMenuVisualizer() {
+  const vCanvas = document.getElementById('menu-visualizer');
+  if (!vCanvas) return;
+  const vCtx = vCanvas.getContext('2d');
+  let vPhase = 0;
+
+  function drawVisualizer() {
+    const scrMenu = document.getElementById('screen-menu');
+    if (scrMenu && scrMenu.classList.contains('active')) {
+      vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+      const numBars = 30;
+      const barW = (vCanvas.width / numBars) - 2;
+      const isPlaying = window.SoundSystem ? window.SoundSystem.getMusicEnabled() : true;
+      vPhase += 0.08;
+
+      for (let i = 0; i < numBars; i++) {
+        const amp = isPlaying
+          ? (Math.sin(vPhase * 2 + i * 0.4) * 0.5 + 0.5) * (Math.cos(vPhase * 1.5 - i * 0.25) * 0.4 + 0.6)
+          : 0.06;
+        const barH = Math.max(3, amp * (vCanvas.height - 4));
+        const x = i * (barW + 2);
+        const y = vCanvas.height - barH;
+
+        const grad = vCtx.createLinearGradient(0, y, 0, vCanvas.height);
+        grad.addColorStop(0, '#00f7ff');
+        grad.addColorStop(1, 'rgba(0, 247, 255, 0.15)');
+        vCtx.fillStyle = grad;
+        vCtx.fillRect(x, y, barW, barH);
+      }
+    }
+    requestAnimationFrame(drawVisualizer);
+  }
+  drawVisualizer();
+}
+
 // Expose Public Simulation API
 (typeof window !== 'undefined' ? window : globalThis).NeuroArena = {
   getSwarm: () => swarm,
@@ -1232,15 +2058,19 @@ document.addEventListener('keydown', e => {
 
 (function boot() {
   log('┌─────────────────────────────────────────┐', 'log-champion');
-  log('│  NEURO-PACMAN ARENA — AI Swarm Sandbox  │', 'log-champion');
-  log('│  35 neural agents · genetic evolution   │', 'log-champion');
+  log('│  FOLDSPACE // WORMHOLE MAZE SURVIVAL    │', 'log-champion');
   log('└─────────────────────────────────────────┘', 'log-champion');
   log('Dual Tunnels · 4 Energizer Chambers · Dense Reward Shaping', '');
-  log('Modes: 🕹️ ARCADE · ⚔️ 1v1 VS AI · 🔬 SWARM LAB', 'log-champion');
+  log('Modes: 🕹️ ARCADE · Quantum Teleport [T] · 5 Wormhole Tunnels', 'log-champion');
   log('─────────────────────────────────────────────', '');
 
   isChampion = true;
+  updateMenuHighScore();
+  initCyberGridBackground();
+  initMenuVisualizer();
+
   switchMode('arcade');
+  showScreen('menu'); // Start at Page 1: Interface / Menu
 
   rafId = requestAnimationFrame(gameLoop);
 })();

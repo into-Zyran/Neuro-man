@@ -10,33 +10,33 @@
 // ─────────────────────────────────────────────
 
 const RAW_MAP = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,4,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,4,1],
-  [1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1],
-  [1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,0,1,0,1],
-  [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,0,1,0,1,1,1,2,1,2,1,1,1,0,1,0,1,1,1,1,1,1,1],
-  [2,2,2,2,2,0,1,0,1,2,2,2,2,2,2,2,1,0,1,0,2,2,2,2,2,2,2], // Upper warp tunnel!
-  [1,1,1,1,1,0,1,0,1,2,1,1,2,1,1,2,1,0,1,0,1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,0,0,1,2,1,3,3,3,1,2,1,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1,0,1,2,1,3,3,3,1,2,1,0,1,0,1,1,1,0,1,0,1],
-  [1,0,1,1,1,0,1,0,2,2,1,1,1,1,1,2,2,0,1,0,1,1,1,0,1,0,1],
-  [1,0,0,0,1,0,1,0,1,2,2,2,2,2,2,2,1,0,1,0,1,0,0,0,0,0,1],
-  [1,1,1,0,1,0,1,0,1,1,1,1,2,1,1,1,1,0,1,0,1,0,1,1,1,1,1],
-  [1,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1,1,1,1,0,1,2,1,0,1,1,1,1,0,1,1,1,0,1,0,1],
-  [1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1],
-  [2,2,2,0,1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,0,1,0,1,0,2,2,2], // Lower warp tunnel!
-  [1,1,1,0,1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,0,1,0,1,0,1,1,1],
-  [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1],
-  [1,0,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1,0,1],
-  [1,4,0,0,1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,1,0,0,0,0,4,1],
-  [1,1,1,0,1,0,1,0,1,1,1,1,1,1,1,1,1,0,1,0,1,0,1,1,1,1,1],
-  [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], // 0: Top wall
+  [1,4,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,4,1], // 1: Outer corridor + Energizers
+  [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1], // 2: Narrow pathways & pillars
+  [2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,2], // 3: 🌀 WORMHOLE TUNNEL 1 (Left <-> Right)
+  [1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1], // 4: Upper cross-corridors
+  [1,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0,1], // 5: Narrow bypasses
+  [1,0,1,1,1,0,1,1,1,0,1,0,0,0,1,0,1,1,1,0,1,1,1,0,1,0,1], // 6: Intersections
+  [1,0,0,0,1,0,0,0,1,0,1,1,1,1,1,0,1,0,0,0,1,0,0,0,1,0,1], // 7: Mid approaches
+  [2,2,2,0,1,1,1,0,1,2,2,2,2,2,2,2,1,0,1,1,1,0,2,2,2,2,2], // 8: 🌀 WORMHOLE TUNNEL 2 (Upper Warp)
+  [1,1,1,0,1,0,0,0,1,2,1,1,2,1,1,2,1,0,0,0,1,0,1,1,1,1,1], // 9: Citadel gates
+  [1,0,0,0,1,0,1,0,1,2,1,3,3,3,1,2,1,0,1,0,1,0,0,0,0,0,1], // 10: Ghost Citadel
+  [1,0,1,0,0,0,1,0,1,2,1,3,3,3,1,2,1,0,1,0,0,0,1,0,1,0,1], // 11: Ghost Citadel
+  [1,0,1,1,1,0,1,0,2,2,1,1,1,1,1,2,2,0,1,0,1,1,1,0,1,0,1], // 12: Ghost Citadel
+  [2,0,0,0,1,0,1,0,1,2,2,2,2,2,2,2,1,0,1,0,1,0,0,0,0,0,2], // 13: 🌀 WORMHOLE TUNNEL 3 (Mid Warp)
+  [1,1,1,0,1,0,1,0,1,1,1,1,2,1,1,1,1,0,1,0,1,0,1,1,1,1,1], // 14: Central divider
+  [1,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,0,0,0,0,1], // 15: Open mid fairway
+  [1,0,1,1,1,0,1,1,1,1,0,1,2,1,0,1,1,1,1,0,1,1,1,0,1,0,1], // 16: Obstacle blocks
+  [1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1], // 17: Narrow links
+  [2,2,2,0,1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,0,1,0,1,0,2,2,2], // 18: 🌀 WORMHOLE TUNNEL 4 (Lower Warp)
+  [1,1,1,0,1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,0,1,0,1,0,1,1,1], // 19: Lower dividers
+  [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1], // 20: Lower thoroughfare
+  [1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,0,1], // 21: Narrow southern alleys
+  [1,0,1,0,1,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0,1,0,1,0,1,0,1], // 22: Escape loops
+  [2,4,0,0,1,0,1,1,1,0,0,0,2,2,0,0,1,1,1,0,1,0,0,0,4,0,2], // 23: 🌀 WORMHOLE TUNNEL 5 (Deep Warp + Spawn at 13,23)
+  [1,1,1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1,1,1], // 24: Southern gates
+  [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1], // 25: Perimeter passage
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]  // 26: Bottom wall
 ];
 
 const COLS        = 27;
@@ -68,6 +68,8 @@ const BASE_ENERGIZERS = (() => {
 })();
 
 const TOTAL_PELLETS = BASE_PELLETS.reduce((s, v) => s + v, 0);
+const TOTAL_ENERGIZERS = BASE_ENERGIZERS.reduce((s, v) => s + v, 0);
+const TOTAL_POINTS = TOTAL_PELLETS + TOTAL_ENERGIZERS;
 
 // Total walkable corridor tiles
 const TOTAL_WALKABLE = (() => {
@@ -446,7 +448,7 @@ class Agent {
 
 const Engine = {
   RAW_MAP, COLS, ROWS, TILE, MAP_W, MAP_H,
-  BASE_PELLETS, BASE_ENERGIZERS, TOTAL_PELLETS, TOTAL_WALKABLE,
+  BASE_PELLETS, BASE_ENERGIZERS, TOTAL_PELLETS, TOTAL_ENERGIZERS, TOTAL_POINTS, TOTAL_WALKABLE,
   SPAWN_COL, SPAWN_ROW,
   GHOST_HOUSE_ROW, GHOST_HOUSE_COL,
   DIRS, DIR,
@@ -457,13 +459,17 @@ const Engine = {
   computeBFSMap,
   Ghost, Agent,
 
-  createDefaultGhosts() {
-    return [
+  createDefaultGhosts(moveRate = null) {
+    const list = [
       new Ghost(12, 11, 'blinky', '#ff2d55'), // Red Chaser
       new Ghost(14, 11, 'pinky',  '#ffb8ff'), // Pink Ambusher
       new Ghost(12, 12, 'inky',   '#00b8ff'), // Cyan Flanker
       new Ghost(14, 12, 'clyde',  '#ffb700'), // Orange Roamer
     ];
+    if (moveRate !== null) {
+      for (const g of list) g.moveRate = moveRate;
+    }
+    return list;
   },
 
   drawMap(ctx, leaderPellets, leaderEnergizers) {
@@ -506,6 +512,28 @@ const Engine = {
     }
 
     const cx = TILE / 2, cy = TILE / 2;
+
+    // 🌀 Draw 5 Neon Cyberpunk Wormhole Portals at Wall Boundaries
+    const WORMHOLE_ROWS = [3, 8, 13, 18, 23];
+    ctx.save();
+    for (const wr of WORMHOLE_ROWS) {
+      const py = wr * TILE + cy;
+      // Left portal glow & ring
+      ctx.fillStyle = 'rgba(0, 247, 255, 0.25)';
+      ctx.strokeStyle = '#00f7ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, py, TILE * 0.45, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Right portal glow & ring
+      ctx.beginPath();
+      ctx.arc(MAP_W, py, TILE * 0.45, Math.PI / 2, Math.PI * 1.5);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
 
     // Draw regular pellets
     for (let r = 0; r < ROWS; r++) {
@@ -618,9 +646,10 @@ const Engine = {
     else if (player.dir === DIR.DOWN)  heading = 0.5 * Math.PI;
     else if (player.dir === DIR.LEFT)  heading = Math.PI;
 
+    const playerColor = player.color || '#ffe600';
     ctx.shadowBlur  = 22;
-    ctx.shadowColor = '#ffe600';
-    ctx.fillStyle   = '#ffe600';
+    ctx.shadowColor = playerColor;
+    ctx.fillStyle   = playerColor;
 
     ctx.beginPath();
     ctx.moveTo(x, y);

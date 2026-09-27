@@ -3,174 +3,393 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Neuro-Pacman Arena — an asymmetrical AI sandbox where 35 neural-network agents evolve in real-time using genetic algorithms on a Pac-Man grid." />
-  <title>Neuro-Pacman Arena | AI Swarm Sandbox</title>
+  <meta name="description" content="FOLDSPACE — Quantum Wormhole Maze Survival" />
+  <title>FOLDSPACE // Quantum Wormhole Maze Survival</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header id="header">
-    <div id="header-logo">
-      <span class="logo-bracket">[</span>
-      <span class="logo-text">NEURO</span>
-      <span class="logo-accent">PAC</span>
-      <span class="logo-text">MAN</span>
-      <span class="logo-bracket">]</span>
-      <span class="logo-sub">ARENA v1.0 // AI SWARM SANDBOX</span>
+  <!-- ═══════════════════════════════════════════
+       PAGE 1: TITLE & MAIN MENU SCREEN
+       ═══════════════════════════════════════════ -->
+  <div id="screen-menu" class="screen-view active">
+    <!-- Live Cyber Grid & Digital Rain Canvas -->
+    <canvas id="bg-canvas"></canvas>
+    <div class="menu-backdrop-glow"></div>
+
+    <div class="menu-container">
+      <div class="menu-top-row">
+        <div class="menu-logo-badge">WORMHOLE PROTOCOL // v2.0</div>
+        <div class="menu-highscore-badge" id="menu-highscore-badge" title="Saved in local storage">
+          <span class="badge-icon">🏆</span>
+          <span class="badge-label">RECORD:</span>
+          <span class="badge-value" id="val-menu-highscore">00.0</span>
+        </div>
+      </div>
+
+      <div class="menu-logo">
+        <span class="logo-bracket">[</span>
+        <span class="logo-text glitch" data-text="FOLD">FOLD</span>
+        <span class="logo-accent">SPACE</span>
+        <span class="logo-bracket">]</span>
+      </div>
+      <div class="menu-sub">WORMHOLE MAZE SURVIVAL</div>
+
+      <!-- Character Skin Selector -->
+      <div class="skin-selector-wrap">
+        <span class="skin-label">PROTAGONIST CHIP:</span>
+        <div class="skin-buttons" id="skin-buttons">
+          <button class="skin-btn active" data-skin="gold" data-color="#ffe600" title="Classic Cyber Gold">
+            <span class="skin-swatch swatch-gold"></span> GOLD
+          </button>
+          <button class="skin-btn" data-skin="cyan" data-color="#00f7ff" title="Volt Cyan">
+            <span class="skin-swatch swatch-cyan"></span> CYAN
+          </button>
+          <button class="skin-btn" data-skin="emerald" data-color="#00ff88" title="Matrix Emerald">
+            <span class="skin-swatch swatch-emerald"></span> MATRIX
+          </button>
+          <button class="skin-btn" data-skin="crimson" data-color="#ff0055" title="Overclock Crimson">
+            <span class="skin-swatch swatch-crimson"></span> CRIMSON
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-options">
+        <button id="btn-menu-play" class="cyber-btn btn-primary">
+          <span class="btn-glitch-icon">▶</span>
+          <span class="btn-text">PLAY GAME</span>
+          <span class="btn-tag">STAGE 1</span>
+        </button>
+
+        <button id="btn-menu-settings" class="cyber-btn btn-glass">
+          <span class="btn-glitch-icon">⚙</span>
+          <span class="btn-text">SETTINGS</span>
+          <span class="btn-tag">AUDIO &amp; BARRIERS</span>
+        </button>
+
+        <button id="btn-menu-instructions" class="cyber-btn btn-glass">
+          <span class="btn-glitch-icon">📖</span>
+          <span class="btn-text">INSTRUCTIONS</span>
+          <span class="btn-tag">HOW TO SURVIVE</span>
+        </button>
+      </div>
+
+      <!-- Audio Spectrum Visualizer Bar -->
+      <div class="visualizer-wrap">
+        <canvas id="menu-visualizer" width="340" height="28"></canvas>
+      </div>
+
+      <div class="menu-footer">
+        <span>© FOLDSPACE ARCHITECTURE</span>
+        <span class="dot-sep">&middot;</span>
+        <span>ZERO DEPENDENCIES</span>
+        <span class="dot-sep">&middot;</span>
+        <span>WEB AUDIO CHIPTUNE</span>
+      </div>
     </div>
+  </div>
 
-    <div id="mode-tabs">
-      <button id="tab-arcade" class="mode-tab active" title="Play Classic Pac-Man with 3 lives and score">🕹️ ARCADE</button>
-      <button id="tab-duel" class="mode-tab" title="1v1 Duel: You play Blinky hunting the Champion AI">⚔️ 1v1 VS AI</button>
-      <button id="tab-swarm" class="mode-tab" title="Watch 35 Neural Agents evolve in parallel">🔬 SWARM LAB</button>
+  <!-- ═══════════════════════════════════════════
+       PAGE 2: ACTIVE GAMEPLAY SCREEN
+       ═══════════════════════════════════════════ -->
+  <div id="screen-game" class="screen-view">
+    <header id="header">
+      <div id="header-logo" title="Return to Menu">
+        <span class="logo-bracket">[</span>
+        <span class="logo-text">FOLD</span>
+        <span class="logo-accent">SPACE</span>
+        <span class="logo-bracket">]</span>
+      </div>
+
+      <div id="header-stats">
+        <div class="stat-pill">
+          <span class="stat-label" id="stat-1-lbl">SCORE</span>
+          <span class="stat-value" id="gen-display">00000</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label" id="stat-2-lbl">LIVES</span>
+          <span class="stat-value" id="alive-display">🟡 🟡 🟡</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label" id="stat-3-lbl">SHIELDS</span>
+          <span class="stat-value" id="best-display">⚡ ⚡ ⚡</span>
+        </div>
+
+        <!-- Holographic Teleport Battery Gauge -->
+        <div class="stat-pill warp-gauge-pill" id="warp-gauge-pill" title="Eat 🔵 to Charge · Press [T] to Warp">
+          <span class="stat-label">QUANTUM [T]</span>
+          <div class="warp-gauge-box">
+            <div class="warp-gauge-indicator" id="warp-gauge-indicator"></div>
+            <span class="warp-gauge-label" id="warp-gauge-label">EMPTY</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-Line Hamburger Menu Button on Far Right -->
+      <button id="btn-hamburger" class="hamburger-btn" title="Open Game Menu (Pause / Settings / Exit)">
+        <span class="bar bar-1"></span>
+        <span class="bar bar-2"></span>
+        <span class="bar bar-3"></span>
+      </button>
+    </header>
+
+    <main id="main-grid">
+      <section id="panel-right">
+        <div id="canvas-wrapper">
+          <!-- Proximity Threat Danger Vignette -->
+          <div id="threat-vignette" class="threat-vignette hidden"></div>
+
+          <!-- Pellet Streak Combo Badge -->
+          <div id="combo-badge" class="combo-badge hidden">
+            <span class="combo-num" id="combo-val">0</span>x COMBO!
+          </div>
+
+          <canvas id="game-canvas"></canvas>
+
+          <div id="canvas-overlay" class="hidden">
+            <div id="overlay-content">
+              <div class="overlay-title" id="overlay-title">PAUSED</div>
+              <div class="overlay-sub" id="overlay-sub">Press Space to resume</div>
+
+              <!-- Post-Game Run Debriefing Table -->
+              <div class="run-debrief-grid" id="run-debrief-grid">
+                <div class="debrief-item">
+                  <span class="d-label">POINTS EATEN</span>
+                  <span class="d-val accent-cyan" id="deb-pellets">0 / 244</span>
+                </div>
+                <div class="debrief-item">
+                  <span class="d-label">SURVIVAL TIME</span>
+                  <span class="d-val" id="deb-time">00:00</span>
+                </div>
+                <div class="debrief-item">
+                  <span class="d-label">WARPS USED</span>
+                  <span class="d-val accent-gold" id="deb-warps">0</span>
+                </div>
+                <div class="debrief-item">
+                  <span class="d-label">BARRIER SHOCKS</span>
+                  <span class="d-val accent-red" id="deb-strikes">0 / 3</span>
+                </div>
+              </div>
+
+              <div class="overlay-actions">
+                <button id="overlay-btn-resume" class="overlay-action-btn btn-cyan">RESUME</button>
+                <button id="overlay-btn-restart" class="overlay-action-btn btn-yellow">PLAY AGAIN</button>
+                <button id="overlay-btn-menu" class="overlay-action-btn btn-red">EXIT TO MENU</button>
+              </div>
+            </div>
+          </div>
+          <div id="canvas-hint">🕹️ ARROWS / WASD = Navigate &middot; Eat 🔵 = Teleport Charge (Press [T] to Warp!) &middot; Dodge Moving Barriers &middot; 5 Wormholes</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       HAMBURGER DRAWER MENU
+       ═══════════════════════════════════════════ -->
+  <div id="drawer-menu" class="drawer-backdrop hidden">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div class="drawer-title">SYSTEM PAUSE</div>
+        <button id="btn-drawer-close" class="close-icon-btn">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <button id="btn-drawer-resume" class="drawer-btn btn-cyan">
+          <span>▶</span> RESUME GAME
+        </button>
+        <button id="btn-drawer-restart" class="drawer-btn btn-yellow">
+          <span>🔄</span> RESTART STAGE
+        </button>
+        <button id="btn-drawer-settings" class="drawer-btn btn-glass">
+          <span>⚙</span> SETTINGS
+        </button>
+        <button id="btn-drawer-instructions" class="drawer-btn btn-glass">
+          <span>📖</span> INSTRUCTIONS
+        </button>
+        <button id="btn-drawer-exit" class="drawer-btn btn-danger">
+          <span>🚪</span> EXIT TO MENU
+        </button>
+      </div>
     </div>
+  </div>
 
-    <div id="header-stats">
-      <div class="stat-pill">
-        <span class="stat-label" id="stat-1-lbl">SCORE</span>
-        <span class="stat-value" id="gen-display">00000</span>
+  <!-- ═══════════════════════════════════════════
+       SETTINGS MODAL
+       ═══════════════════════════════════════════ -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">⚙ SYSTEM SETTINGS</div>
+        <button id="btn-close-settings" class="close-icon-btn">&times;</button>
       </div>
-      <div class="stat-pill">
-        <span class="stat-label" id="stat-2-lbl">LIVES</span>
-        <span class="stat-value" id="alive-display">🟡 🟡 🟡</span>
+
+      <div class="modal-body">
+        <!-- Setting 1: Music Toggle -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Menu Retro Music</span>
+            <span class="setting-desc">Upbeat 8-bit cyber-arcade theme (plays on title menu only)</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-music" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Setting 2: Sound FX Toggle -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Sound Effects</span>
+            <span class="setting-desc">Waka-waka chews, alarms, warp &amp; zap audio</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-sfx" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Setting 3: Volume Slider -->
+        <div class="setting-item vertical">
+          <div class="setting-info horizontal">
+            <span class="setting-name">Master Volume</span>
+            <span class="setting-value" id="val-volume">60%</span>
+          </div>
+          <input type="range" id="slider-volume" min="0" max="100" value="60" class="neon-slider" />
+        </div>
+
+        <!-- Setting 4: Number of Barriers Customization -->
+        <div class="setting-item vertical">
+          <div class="setting-info horizontal">
+            <span class="setting-name">Number of Moving Barriers</span>
+            <span class="setting-value accent" id="val-barriers">3 BARRIERS</span>
+          </div>
+          <div class="barrier-selector" id="barrier-selector">
+            <button class="barrier-option" data-count="1">1</button>
+            <button class="barrier-option" data-count="2">2</button>
+            <button class="barrier-option active" data-count="3">3 (Default)</button>
+            <button class="barrier-option" data-count="4">4</button>
+            <button class="barrier-option" data-count="5">5</button>
+          </div>
+          <span class="setting-note">Adjusts the active patrolling electric shock barriers in the maze.</span>
+        </div>
+
+        <!-- Setting 5: CRT Scanline & Curved Monitor Simulation -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">CRT Scanline &amp; Bloom Shader</span>
+            <span class="setting-desc">Simulates authentic 80s curved arcade monitor scanlines</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-crt" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Setting 6: Impact Screen Shake -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-name">Impact Screen Shake</span>
+            <span class="setting-desc">Tactile screen jolt on electric shocks &amp; barrier collisions</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggle-shake" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
-      <div class="stat-pill">
-        <span class="stat-label" id="stat-3-lbl">PELLETS</span>
-        <span class="stat-value" id="best-display">364</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">FPS</span>
-        <span class="stat-value" id="fps-display">--</span>
+
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="cyber-btn btn-primary">SAVE &amp; CLOSE</button>
       </div>
     </div>
-    <div id="header-controls">
-      <button id="btn-train" class="ctrl-btn btn-danger" title="Clear weights, reset to Gen 1, watch chaotic learning">
-        <span class="btn-icon">&#9889;</span> LIVE TRAIN
-      </button>
-      <button id="btn-pause" class="ctrl-btn btn-secondary" title="Pause / Resume simulation">
-        <span class="btn-icon">&#9208;</span> PAUSE
-      </button>
-      <button id="btn-speed" class="ctrl-btn btn-secondary" title="Toggle fast-forward">
-        <span class="btn-icon">&#9193;</span> 1x
-      </button>
+  </div>
 
-      <button id="btn-barrier" class="ctrl-btn btn-accent" title="Maze Architect Mode: Click or Shift+Click to place/remove dynamic neon barriers (Hotkey: B)">
-        <span class="btn-icon">&#129521;</span> BARRIERS (B)
-      </button>
-      <button id="btn-warp" class="ctrl-btn btn-purple" title="Turbo Warp: Evolve 10 generations in pure headless memory">
-        <span class="btn-icon">&#9197;</span> WARP 10G
-      </button>
+  <!-- ═══════════════════════════════════════════
+       INSTRUCTIONS MODAL
+       ═══════════════════════════════════════════ -->
+  <div id="modal-instructions" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">📖 FIELD MANUAL // HOW TO SURVIVE</div>
+        <button id="btn-close-instructions" class="close-icon-btn">&times;</button>
+      </div>
+
+      <div class="modal-body instructions-grid">
+        <div class="instruction-card">
+          <div class="card-icon">🎯</div>
+          <div class="card-title">1. Complete All Points</div>
+          <div class="card-text">
+            Maneuver through the expanded maze to eat all pellets. Clear every point without losing all lives or barrier shields to achieve <strong>VICTORY</strong>!
+          </div>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-icon">⚡</div>
+          <div class="card-title">2. Moving Hazard Barriers</div>
+          <div class="card-text">
+            Slow electric shock barriers patrol the key corridors. If you touch one, you lose <strong>1 Shield</strong> and <strong>+1 Ghost</strong> spawns! Touch them 3 times and you lose!
+          </div>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-icon">👻</div>
+          <div class="card-title">3. Slow Ghost Pursuers</div>
+          <div class="card-text">
+            Ghosts stalk you at a slow, relentless speed. Direct contact costs 1 Life (<span class="accent-gold">🟡</span>). Ghosts are immune to barriers, so keep your distance!
+          </div>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-icon">🌀</div>
+          <div class="card-title">4. Quantum Warp [T]</div>
+          <div class="card-text">
+            Eat any glowing blue point (<span class="accent-cyan">🔵</span>) to stock a Quantum Warp charge. Press <strong>[T]</strong> to instantly warp to the safest corridor far from all ghosts!
+          </div>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-icon">🚪</div>
+          <div class="card-title">5. 5 Wormhole Tunnels</div>
+          <div class="card-text">
+            Use the 5 glowing neon portal gates along the boundary walls (Rows 3, 8, 13, 18, 23) to instantly transport between the left and right sides of the map.
+          </div>
+        </div>
+
+        <div class="instruction-card">
+          <div class="card-icon">⌨️</div>
+          <div class="card-title">6. Game Controls &amp; Hotkeys</div>
+          <div class="card-text">
+            Use standard arcade keys or the visual keycaps guide below for full tactical control:
+          </div>
+          <!-- Visual Keycaps Cluster -->
+          <div class="keycaps-cluster">
+            <div class="key-box">
+              <span class="key-tag">MOVE</span>
+              <div class="key-row"><kbd>W</kbd> <kbd>▲</kbd></div>
+              <div class="key-row"><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>◄</kbd><kbd>▼</kbd><kbd>►</kbd></div>
+            </div>
+            <div class="key-box">
+              <span class="key-tag">WARP</span>
+              <div class="key-row"><kbd class="kbd-cyan">[ T ]</kbd></div>
+            </div>
+            <div class="key-box">
+              <span class="key-tag">PAUSE</span>
+              <div class="key-row"><kbd class="kbd-space">SPACE</kbd> <kbd>ESC</kbd></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-back-instructions" class="cyber-btn btn-primary">GOT IT // BACK</button>
+      </div>
     </div>
-  </header>
+  </div>
 
-  <main id="main-grid">
-    <aside id="panel-left">
-      <div id="terminal-header">
-        <span class="term-dot red"></span>
-        <span class="term-dot yellow"></span>
-        <span class="term-dot green"></span>
-        <span class="term-title">// TELEMETRY STREAM</span>
-      </div>
-
-      <div id="terminal-body">
-        <div id="terminal-log"></div>
-        <div id="terminal-cursor">&#9608;</div>
-      </div>
-
-      <div id="metrics-panel">
-        <div class="metric-section">
-          <div class="metric-title">&#9656; SWARM STATUS</div>
-          <div class="metric-row">
-            <span class="metric-label">Generation</span>
-            <span class="metric-val" id="m-gen">1</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Epoch Timer</span>
-            <span class="metric-val" id="m-timer">10.0s</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Alive Agents</span>
-            <span class="metric-val" id="m-alive">35</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Stagnation</span>
-            <span class="metric-val" id="m-stag">0 / 3</span>
-          </div>
-        </div>
-        <div class="metric-section">
-          <div class="metric-title">&#9656; FITNESS TRACKER</div>
-          <div class="metric-row">
-            <span class="metric-label">Leader Score</span>
-            <span class="metric-val accent" id="m-leader">0.00</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Avg Score</span>
-            <span class="metric-val" id="m-avg">0.00</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">All-Time Best</span>
-            <span class="metric-val accent" id="m-alltime">0.00</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Pellets (Leader)</span>
-            <span class="metric-val" id="m-pellets">0</span>
-          </div>
-        </div>
-        <div class="metric-section">
-          <div class="metric-title">&#9656; EVOLUTION PARAMS</div>
-          <div class="metric-row">
-            <span class="metric-label">Mutation Rate</span>
-            <span class="metric-val" id="m-mutrate">6.0%</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Ghost Count</span>
-            <span class="metric-val" id="m-ghosts">4</span>
-          </div>
-          <div class="metric-row">
-            <span class="metric-label">Mode</span>
-            <span class="metric-val mode-champion" id="m-mode">CHAMPION</span>
-          </div>
-        </div>
-        <div class="metric-section">
-          <div class="metric-title">&#9656; ALPHA LEADER BRAIN</div>
-          <div id="neural-viz">
-            <canvas id="nn-canvas" width="220" height="120"></canvas>
-          </div>
-          <div class="sensor-grid" id="sensor-grid">
-            <div class="sensor-item" title="Wall clearance Up"><span class="sensor-dir">W_UP</span><span class="sensor-val" id="s-up">0.0</span></div>
-            <div class="sensor-item" title="Wall clearance Down"><span class="sensor-dir">W_DN</span><span class="sensor-val" id="s-dn">0.0</span></div>
-            <div class="sensor-item" title="Wall clearance Left"><span class="sensor-dir">W_LT</span><span class="sensor-val" id="s-lt">0.0</span></div>
-            <div class="sensor-item" title="Wall clearance Right"><span class="sensor-dir">W_RT</span><span class="sensor-val" id="s-rt">0.0</span></div>
-            <div class="sensor-item" title="Ghost Proximity"><span class="sensor-dir">G_PRX</span><span class="sensor-val" id="s-gprox">0.00</span></div>
-            <div class="sensor-item" title="Ghost Relative Vector X"><span class="sensor-dir">G_VECx</span><span class="sensor-val" id="s-gx">0.00</span></div>
-            <div class="sensor-item" title="Ghost Relative Vector Y"><span class="sensor-dir">G_VECy</span><span class="sensor-val" id="s-gy">0.00</span></div>
-            <div class="sensor-item" title="BFS Pellet Path X"><span class="sensor-dir">P_BFSx</span><span class="sensor-val" id="s-px">0.00</span></div>
-            <div class="sensor-item" title="BFS Pellet Path Y"><span class="sensor-dir">P_BFSy</span><span class="sensor-val" id="s-py">0.00</span></div>
-            <div class="sensor-item" title="Pellet Proximity"><span class="sensor-dir">P_PRX</span><span class="sensor-val" id="s-pprox">0.00</span></div>
-            <div class="sensor-item" title="Current Heading X"><span class="sensor-dir">DIR_X</span><span class="sensor-val" id="s-dirx">0</span></div>
-            <div class="sensor-item" title="Current Heading Y"><span class="sensor-dir">DIR_Y</span><span class="sensor-val" id="s-diry">0</span></div>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <section id="panel-right">
-      <div id="canvas-wrapper">
-        <canvas id="game-canvas"></canvas>
-        <div id="canvas-overlay" class="hidden">
-          <div id="overlay-content">
-            <div class="overlay-title" id="overlay-title">PAUSED</div>
-            <div class="overlay-sub" id="overlay-sub">Press PAUSE to resume</div>
-            <button id="overlay-btn" class="overlay-btn" style="display:none;">RESTART</button>
-          </div>
-        </div>
-        <div id="canvas-hint">🕹️ ARCADE: Arrow Keys / WASD &middot; Lure Ghosts into Electric Barriers ⚡ to Vaporize them &middot; Avoid Barriers (bumping spawns +1 Ghost) &middot; Kill All Ghosts to Win!</div>
-      </div>
-    </section>
-  </main>
-
+  <!-- Scripts -->
   <script src="math.js"></script>
   <script src="engine.js"></script>
   <script src="arcade.js"></script>
+  <script src="audio.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
