@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Neuro-Pacman Arena — an asymmetrical AI sandbox where 35 neural-network agents evolve in real-time using genetic algorithms on a Pac-Man grid." />
+  <title>Neuro-Pacman Arena | AI Swarm Sandbox</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="header">
+    <div id="header-logo">
+      <span class="logo-bracket">[</span>
+      <span class="logo-text">NEURO</span>
+      <span class="logo-accent">PAC</span>
+      <span class="logo-text">MAN</span>
+      <span class="logo-bracket">]</span>
+      <span class="logo-sub">ARENA v1.0 // AI SWARM SANDBOX</span>
+    </div>
+    <div id="header-stats">
+      <div class="stat-pill">
+        <span class="stat-label">GEN</span>
+        <span class="stat-value" id="gen-display">001</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">FPS</span>
+        <span class="stat-value" id="fps-display">--</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">ALIVE</span>
+        <span class="stat-value" id="alive-display">35</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">BEST FIT</span>
+        <span class="stat-value" id="best-display">0.00</span>
+      </div>
+    </div>
+    <div id="header-controls">
+      <button id="btn-train" class="ctrl-btn btn-danger" title="Clear weights, reset to Gen 1, watch chaotic learning">
+        <span class="btn-icon">&#9889;</span> LIVE TRAIN
+      </button>
+      <button id="btn-pause" class="ctrl-btn btn-secondary" title="Pause / Resume simulation">
+        <span class="btn-icon">&#9208;</span> PAUSE
+      </button>
+      <button id="btn-speed" class="ctrl-btn btn-secondary" title="Toggle fast-forward">
+        <span class="btn-icon">&#9193;</span> 1x
+      </button>
+    </div>
+  </header>
+
+  <main id="main-grid">
+    <aside id="panel-left">
+      <div id="terminal-header">
+        <span class="term-dot red"></span>
+        <span class="term-dot yellow"></span>
+        <span class="term-dot green"></span>
+        <span class="term-title">// TELEMETRY STREAM</span>
+      </div>
+
+      <div id="terminal-body">
+        <div id="terminal-log"></div>
+        <div id="terminal-cursor">&#9608;</div>
+      </div>
+
+      <div id="metrics-panel">
+        <div class="metric-section">
+          <div class="metric-title">&#9656; SWARM STATUS</div>
+          <div class="metric-row">
+            <span class="metric-label">Generation</span>
+            <span class="metric-val" id="m-gen">1</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Epoch Timer</span>
+            <span class="metric-val" id="m-timer">10.0s</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Alive Agents</span>
+            <span class="metric-val" id="m-alive">35</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Stagnation</span>
+            <span class="metric-val" id="m-stag">0 / 3</span>
+          </div>
+        </div>
+        <div class="metric-section">
+          <div class="metric-title">&#9656; FITNESS TRACKER</div>
+          <div class="metric-row">
+            <span class="metric-label">Leader Score</span>
+            <span class="metric-val accent" id="m-leader">0.00</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Avg Score</span>
+            <span class="metric-val" id="m-avg">0.00</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">All-Time Best</span>
+            <span class="metric-val accent" id="m-alltime">0.00</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Pellets (Leader)</span>
+            <span class="metric-val" id="m-pellets">0</span>
+          </div>
+        </div>
+        <div class="metric-section">
+          <div class="metric-title">&#9656; EVOLUTION PARAMS</div>
+          <div class="metric-row">
+            <span class="metric-label">Mutation Rate</span>
+            <span class="metric-val" id="m-mutrate">6.0%</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Ghost Count</span>
+            <span class="metric-val" id="m-ghosts">4</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Mode</span>
+            <span class="metric-val mode-champion" id="m-mode">CHAMPION</span>
+          </div>
+        </div>
+        <div class="metric-section">
+          <div class="metric-title">&#9656; ALPHA LEADER BRAIN</div>
+          <div id="neural-viz">
+            <canvas id="nn-canvas" width="220" height="120"></canvas>
+          </div>
+          <div class="sensor-grid" id="sensor-grid">
+            <div class="sensor-item"><span class="sensor-dir">UP</span><span class="sensor-val" id="s-up">0</span></div>
+            <div class="sensor-item"><span class="sensor-dir">DN</span><span class="sensor-val" id="s-dn">0</span></div>
+            <div class="sensor-item"><span class="sensor-dir">LT</span><span class="sensor-val" id="s-lt">0</span></div>
+            <div class="sensor-item"><span class="sensor-dir">RT</span><span class="sensor-val" id="s-rt">0</span></div>
+            <div class="sensor-item"><span class="sensor-dir">Gx</span><span class="sensor-val" id="s-gx">0.00</span></div>
+            <div class="sensor-item"><span class="sensor-dir">Gy</span><span class="sensor-val" id="s-gy">0.00</span></div>
+            <div class="sensor-item"><span class="sensor-dir">Px</span><span class="sensor-val" id="s-px">0.00</span></div>
+            <div class="sensor-item"><span class="sensor-dir">Py</span><span class="sensor-val" id="s-py">0.00</span></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section id="panel-right">
+      <div id="canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+        <div id="canvas-overlay" class="hidden">
+          <div id="overlay-content">
+            <div class="overlay-title" id="overlay-title">PAUSED</div>
+            <div class="overlay-sub" id="overlay-sub">Press PAUSE to resume</div>
+          </div>
+        </div>
+        <div id="canvas-hint">Click any open tile to spawn a Ghost &middot; Space = Pause</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="math.js"></script>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
