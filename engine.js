@@ -164,6 +164,9 @@ class Agent {
     this.moveTimer    = 0;
     this.moveRate     = 8;                             // frames per step
     this.lastOutputs  = new Float64Array(4);
+    this.stuckFrames  = 0;
+    this.lastCol      = -1;
+    this.lastRow      = -1;
   }
 
   reset(col, row) {
@@ -175,6 +178,9 @@ class Agent {
     this.frames = 0; this.fitness = 0;
     this.visitCount.fill(0);
     this.moveTimer = 0;
+    this.stuckFrames = 0;
+    this.lastCol = col;
+    this.lastRow = row;
   }
 
   /** Compute composite fitness. */
@@ -251,7 +257,7 @@ const Engine = {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const idx = r * COLS + c;
-        if (BASE_PELLETS[idx] && !leaderPellets[idx]) continue;
+        if (BASE_PELLETS[idx] && leaderPellets[idx]) continue;
         if (!BASE_PELLETS[idx]) continue;
         const x = c * TILE, y = r * TILE;
         ctx.beginPath();

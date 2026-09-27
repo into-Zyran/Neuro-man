@@ -181,10 +181,21 @@ function getSensors(agent, ghostArr) {
  * @param {number} row
  * @returns {object} chosen Engine.DIR entry
  */
-function validatedDirection(outputs, col, row) {
+function validatedDirection(outputs, col, row, currentDir) {
   // outputs index → DIR
   const mapping = [Engine.DIR.UP, Engine.DIR.DOWN, Engine.DIR.LEFT, Engine.DIR.RIGHT];
   const scores  = Array.from(outputs);          // copy
+
+  if (currentDir) {
+    const reverseMap = {
+      0: 1, // UP -> DOWN
+      1: 0, // DOWN -> UP
+      2: 3, // LEFT -> RIGHT
+      3: 2  // RIGHT -> LEFT
+    };
+    const reverseIdx = reverseMap[currentDir.idx];
+    scores[reverseIdx] -= 1000;
+  }
 
   for (let attempt = 0; attempt < 4; attempt++) {
     let best = 0;
@@ -444,7 +455,7 @@ function gameLoop(ts) {
       agent.lastOutputs.set(outputs);
 
       // 3. Validation shield
-      const dir = validatedDirection(outputs, agent.col, agent.row);
+      const dir = validatedDirection(outputs, agent.col, agent.row, agent.dir);
       agent.dir = dir;
 
       // 4. Move
@@ -453,6 +464,22 @@ function gameLoop(ts) {
       if (Engine.isWalkable(nc, nr)) {
         agent.col = nc;
         agent.row = nr;
+      }
+
+      // Anti-camping kill switch
+      if (agent.col === agent.lastCol && agent.row === agent.lastRow) {
+        agent.stuckFrames++;
+      } else {
+        agent.stuckFrames = 0;
+        agent.lastCol = agent.col;
+        agent.lastRow = agent.row;
+      }
+
+      if (agent.stuckFrames > 5) {
+        agent.alive = false;
+        agent.calcFitness();
+        log(`✗ Agent died (camping). Pellets=${agent.pelletsCount} Fit=${agent.fitness.toFixed(1)}`, 'log-death');
+        continue;
       }
 
       // 5. Visit tracking
