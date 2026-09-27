@@ -518,21 +518,21 @@ function updateHUD(sensors) {
   if (activeMode === 'arcade') {
     if (elGen)   elGen.textContent   = humanPlayer.score.toFixed(1);
     if (elAlive) elAlive.textContent = '🟡 '.repeat(Math.max(0, humanPlayer.lives)) || '💀';
-    if (elBest)  elBest.textContent  = Math.max(0, Engine.TOTAL_PELLETS - humanPlayer.pelletsCount);
+    if (elBest)  elBest.textContent  = `${ghosts.length} 👻`;
     if (elFps)   elFps.textContent   = fpsDisplay > 0 ? fpsDisplay : '--';
 
     if (elMGen)     elMGen.textContent     = 'ARCADE';
     if (elMTimer)   elMTimer.textContent   = humanPlayer.score.toFixed(1) + ' / 100';
     if (elMAlive)   elMAlive.textContent   = humanPlayer.lives + ' / 3';
-    if (elMStag)    elMStag.textContent    = humanPlayer.ghostsEatenCount + ' eaten';
+    if (elMStag)    elMStag.textContent    = (window.ArcadeMode ? window.ArcadeMode.getTrapKills() : humanPlayer.ghostsEatenCount) + ' killed';
     if (elMLeader)  elMLeader.textContent  = humanPlayer.score.toFixed(1);
     if (elMAvg)     elMAvg.textContent     = humanPlayer.pelletsCount;
     if (elMAlltime) elMAlltime.textContent = allTimeBest.toFixed(1);
     if (elMPellets) elMPellets.textContent = humanPlayer.pelletsCount;
-    if (elMMutrate) elMMutrate.textContent = 'N/A';
-    if (elMGhosts)  elMGhosts.textContent  = ghosts.length;
+    if (elMMutrate) elMMutrate.textContent = 'TRAP ARENA';
+    if (elMGhosts)  elMGhosts.textContent  = `${ghosts.length} REMAINING`;
     if (elMMode) {
-      elMMode.textContent = 'ARCADE';
+      elMMode.textContent = 'TRAP RUN';
       elMMode.className   = 'metric-val mode-champion';
     }
   } else if (activeMode === 'duel') {
@@ -666,28 +666,16 @@ function gameLoop(ts) {
           humanPlayer.row = nr;
         }
 
-        // Pellet eating (scaled to 60 pts max)
+        // Pellet eating (points continue building towards 100)
         const pi = humanPlayer.row * Engine.COLS + humanPlayer.col;
         if (Engine.BASE_PELLETS[pi] && !humanPlayer.pelletsEaten[pi]) {
           humanPlayer.pelletsEaten[pi] = 1;
           humanPlayer.pelletsCount++;
-          const pDelta = 60.0 / Math.max(1, Engine.TOTAL_PELLETS);
+          const pDelta = 40.0 / Math.max(1, Engine.TOTAL_PELLETS);
           humanPlayer.score = Math.min(100.0, humanPlayer.score + pDelta);
-          if (humanPlayer.pelletsCount >= Engine.TOTAL_PELLETS) {
-            humanPlayer.score = 100.0;
-            overlay.classList.remove('hidden');
-            overlayTitle.textContent = 'VICTORY!';
-            overlayTitle.className = 'overlay-title title-victory';
-            overlaySub.textContent = `STAGE 1 CLEARED! PERFECT SCORE: 100 / 100`;
-            if (overlayBtn) {
-              overlayBtn.textContent = 'PLAY AGAIN';
-              overlayBtn.style.display = 'inline-block';
-            }
-            return;
-          }
         }
 
-        // Super Energizer eating (+10.0 pts each, 4 energizers = 40.0 pts max)
+        // Super Energizer eating (+10.0 pts each)
         if (Engine.BASE_ENERGIZERS[pi] && !humanPlayer.energizersEaten[pi]) {
           humanPlayer.energizersEaten[pi] = 1;
           humanPlayer.energizersCount++;
@@ -697,10 +685,28 @@ function gameLoop(ts) {
         }
       }
 
+      // ⚡ ArcadeMode Electric Hazard Barriers update (ghost traps, player shocks & victory check)
+      if (window.ArcadeMode) {
+        window.ArcadeMode.update(humanPlayer, ghosts, {
+          addFloatingText,
+          log,
+          onVictory: () => {
+            overlay.classList.remove('hidden');
+            overlayTitle.textContent = 'VICTORY!';
+            overlayTitle.className = 'overlay-title title-victory';
+            overlaySub.textContent = `ALL GHOSTS VAPORIZED! Maze Secured! Score: ${humanPlayer.score.toFixed(1)} / 100`;
+            if (overlayBtn) {
+              overlayBtn.textContent = 'PLAY AGAIN';
+              overlayBtn.style.display = 'inline-block';
+            }
+          }
+        });
+      }
+
       // Ghosts update
       for (const g of ghosts) g.update(humanPlayer);
 
-      // Ghost collisions (relentless lethal hunters: contact with ghost costs a life)
+      // Ghost collisions (contact with ghost costs a life)
       for (const g of ghosts) {
         if (g.collides(humanPlayer.col, humanPlayer.row)) {
           humanPlayer.lives--;
@@ -715,6 +721,9 @@ function gameLoop(ts) {
 
     // Render Arcade
     Engine.drawMap(ctx, humanPlayer.pelletsEaten, humanPlayer.energizersEaten);
+    if (window.ArcadeMode) {
+      window.ArcadeMode.render(ctx);
+    }
     Engine.drawPlayer(ctx, humanPlayer);
     for (const g of ghosts) Engine.drawGhost(ctx, g);
     Engine.drawFloatingTexts(ctx, floatingTexts);
@@ -986,6 +995,11 @@ function gameLoop(ts) {
 // ─────────────────────────────────────────────
 
 canvas.addEventListener('click', function (e) {
+  // In Arcade Mode: clicking to spawn ghosts is disabled
+  if (activeMode === 'arcade') {
+    return;
+  }
+
   const rect    = canvas.getBoundingClientRect();
   const scaleX  = canvas.width  / rect.width;
   const scaleY  = canvas.height / rect.height;
@@ -1008,7 +1022,7 @@ canvas.addEventListener('click', function (e) {
     return;
   }
 
-  // Default: Spawn hunter ghost
+  // Default: Spawn hunter ghost (Swarm mode)
   if (!Engine.isWalkable(col, row)) return;
   const colors  = ['#ff2d55', '#ff6b00', '#a855f7', '#00ff88'];
   const color   = colors[ghosts.length % colors.length];
@@ -1122,11 +1136,12 @@ function switchMode(mode) {
   if (mode === 'arcade') {
     if (stat1Lbl) stat1Lbl.textContent = 'SCORE';
     if (stat2Lbl) stat2Lbl.textContent = 'LIVES';
-    if (stat3Lbl) stat3Lbl.textContent = 'PELLETS';
-    if (canvasHint) canvasHint.textContent = 'Arrow Keys / WASD = Navigate · Space = Pause · Clear all pellets to win!';
+    if (stat3Lbl) stat3Lbl.textContent = 'GHOSTS';
+    if (canvasHint) canvasHint.textContent = '🕹️ ARCADE: Arrow Keys / WASD · Lure Ghosts into Electric Barriers ⚡ to Vaporize them · Avoid Barriers (bumping spawns +1 Ghost) · Kill All Ghosts to Win!';
     humanPlayer.reset(true);
+    if (window.ArcadeMode) window.ArcadeMode.reset();
     ghosts = Engine.createDefaultGhosts();
-    log('🕹️ ARCADE MODE ACTIVATED! Take control of Pac-Man with Arrow Keys / WASD! 3 Lives.', 'log-champion');
+    log('🕹️ ARCADE MODE ACTIVATED! Lure ghosts into Electric Barriers ⚡ to vaporize them! Avoid touching barriers (+1 ghost penalty). Kill all ghosts to win!', 'log-champion');
   } else if (mode === 'duel') {
     if (stat1Lbl) stat1Lbl.textContent = 'TIME';
     if (stat2Lbl) stat2Lbl.textContent = 'AI FOOD';
