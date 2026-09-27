@@ -8,21 +8,24 @@
 // 1.  UTILITY
 // ─────────────────────────────────────────────
 
-/** Seeded fast random (mulberry32) for reproducible champion weights. */
+/** Seeded fast random (mulberry32) for reproducible weights. */
 function mulberry32(seed) {
   return function () {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
 function tanh(x) { return Math.tanh(x); }
 
+function leakyRelu(x) { return x > 0 ? x : 0.05 * x; }
+
 function randn() {
   // Box-Muller: gaussian(0,1)
-  const u = 1 - Math.random(), v = Math.random();
+  const u = Math.max(1e-7, 1 - Math.random());
+  const v = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
@@ -33,9 +36,9 @@ function randn() {
 
 class NeuralNet {
   /**
-   * @param {number[]} topology  e.g. [8, 6, 4]
+   * @param {number[]} topology  e.g. [12, 10, 4]
    */
-  constructor(topology) {
+  constructor(topology = [12, 10, 4]) {
     this.topology = topology;
     this.layers   = topology.length;
     // weight arrays: W[l] is flat array of size [out × in]
@@ -45,12 +48,13 @@ class NeuralNet {
     for (let l = 0; l < this.layers - 1; l++) {
       const inn  = topology[l];
       const out  = topology[l + 1];
-      // Xavier/Glorot initialisation
+      // Xavier / Glorot initialization
       const gain = Math.sqrt(2.0 / (inn + out));
       const w = new Float64Array(out * inn);
       for (let i = 0; i < w.length; i++) w[i] = randn() * gain;
       this.W.push(w);
       const b = new Float64Array(out);
+      for (let i = 0; i < b.length; i++) b[i] = randn() * 0.1;
       this.B.push(b);
     }
     // activation cache for neural-viz
@@ -65,15 +69,18 @@ class NeuralNet {
     this.activations.push(current);
 
     for (let l = 0; l < this.layers - 1; l++) {
-      const inn = this.topology[l];
-      const out = this.topology[l + 1];
-      const W   = this.W[l];
-      const B   = this.B[l];
+      const inn  = this.topology[l];
+      const out  = this.topology[l + 1];
+      const W    = this.W[l];
+      const B    = this.B[l];
       const next = new Float64Array(out);
+      const isOutput = (l === this.layers - 2);
+
       for (let j = 0; j < out; j++) {
         let sum = B[j];
         const offset = j * inn;
         for (let i = 0; i < inn; i++) sum += W[offset + i] * current[i];
+        // Hidden layers use tanh/leaky, output uses tanh
         next[j] = tanh(sum);
       }
       current = next;
@@ -96,9 +103,22 @@ class NeuralNet {
   setWeights(arr) {
     let idx = 0;
     for (let l = 0; l < this.W.length; l++) {
-      for (let i = 0; i < this.W[l].length; i++) this.W[l][i] = arr[idx++];
-      for (let i = 0; i < this.B[l].length; i++) this.B[l][i] = arr[idx++];
+      for (let i = 0; i < this.W[l].length; i++) {
+        if (idx < arr.length) this.W[l][i] = arr[idx++];
+      }
+      for (let i = 0; i < this.B[l].length; i++) {
+        if (idx < arr.length) this.B[l][i] = arr[idx++];
+      }
     }
+  }
+
+  /** Total number of trainable parameters */
+  getParameterCount() {
+    let count = 0;
+    for (let l = 0; l < this.layers - 1; l++) {
+      count += this.topology[l] * this.topology[l + 1] + this.topology[l + 1];
+    }
+    return count;
   }
 
   /** Deep clone this network. */
@@ -107,6 +127,21 @@ class NeuralNet {
     copy.setWeights(this.getWeights());
     return copy;
   }
+
+  /** Serialize to JSON */
+  toJSON() {
+    return {
+      topology: this.topology,
+      weights: this.getWeights()
+    };
+  }
+
+  /** Deserialize from JSON */
+  static fromJSON(json) {
+    const net = new NeuralNet(json.topology);
+    net.setWeights(json.weights);
+    return net;
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -114,16 +149,17 @@ class NeuralNet {
 // ─────────────────────────────────────────────
 
 const GA = (() => {
-  const TOPOLOGY      = [8, 6, 4];
-  const SWARM_SIZE    = 35;
-  const BASE_MUTATION = 0.06;
-  const ENTROPY_MUTATION = 0.15;
+  const TOPOLOGY       = [12, 10, 4];
+  const SWARM_SIZE     = 35;
+  const ELITE_COUNT    = 2;
+  const BASE_MUTATION  = 0.08;
+  const ENTROPY_MUTATION = 0.20;
 
   /** Create a fresh random network. */
   function createBrain() { return new NeuralNet(TOPOLOGY); }
 
   /**
-   * Tournament selection — picks the fitter of k random specimens.
+   * Tournament selection — picks the fittest of k random specimens.
    * @param {{net: NeuralNet, fitness: number}[]} pool
    * @param {number} k tournament size
    */
@@ -137,30 +173,44 @@ const GA = (() => {
   }
 
   /**
-   * Uniform crossover on two flat weight arrays.
-   * Each gene inherited with 50/50 chance from either parent.
+   * Uniform blend crossover on two flat weight arrays.
+   * Each gene inherited with 50/50 chance or subtle blend.
    */
   function crossover(a, b) {
     const child = new Float64Array(a.length);
     for (let i = 0; i < a.length; i++) {
-      child[i] = Math.random() < 0.5 ? a[i] : b[i];
+      const r = Math.random();
+      if (r < 0.45) {
+        child[i] = a[i];
+      } else if (r < 0.90) {
+        child[i] = b[i];
+      } else {
+        // Blend interpolation
+        child[i] = 0.5 * (a[i] + b[i]);
+      }
     }
     return child;
   }
 
   /**
-   * Gaussian mutation with adaptive rate.
+   * Adaptive Gaussian mutation.
    * @param {Float64Array|number[]} genes
    * @param {number} rate  probability each gene mutates
    * @param {boolean} entropy  whether to apply big entropy jump
    */
   function mutate(genes, rate, entropy) {
     const effectiveRate = entropy ? rate + ENTROPY_MUTATION : rate;
+    const power = entropy ? 0.6 : 0.25;
     const result = new Float64Array(genes.length);
     for (let i = 0; i < genes.length; i++) {
       result[i] = genes[i];
       if (Math.random() < effectiveRate) {
-        result[i] += randn() * (entropy ? 0.5 : 0.2);
+        // Gaussian perturbation with occasional Cauchy sign flip
+        if (Math.random() < 0.05) {
+          result[i] = randn() * 1.0; // complete gene reset
+        } else {
+          result[i] += randn() * power;
+        }
       }
     }
     return result;
@@ -175,10 +225,12 @@ const GA = (() => {
   function evolve(scored, applyEntropy) {
     const nextGen = [];
 
-    // Elitism: top 1 survives unchanged
-    nextGen.push(scored[0].net.clone());
+    // Multi-Elitism: top ELITE_COUNT agents survive unchanged
+    for (let i = 0; i < Math.min(ELITE_COUNT, scored.length); i++) {
+      nextGen.push(scored[i].net.clone());
+    }
 
-    // Fill remaining 34 slots via tournament + crossover + mutation
+    // Fill remaining slots via tournament selection + crossover + mutation
     while (nextGen.length < SWARM_SIZE) {
       const parentA = tournamentSelect(scored);
       const parentB = tournamentSelect(scored);
@@ -193,5 +245,15 @@ const GA = (() => {
     return nextGen;
   }
 
-  return { TOPOLOGY, SWARM_SIZE, BASE_MUTATION, createBrain, evolve };
+  return {
+    TOPOLOGY,
+    SWARM_SIZE,
+    ELITE_COUNT,
+    BASE_MUTATION,
+    createBrain,
+    evolve,
+    crossover,
+    mutate
+  };
 })();
+

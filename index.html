@@ -17,22 +17,29 @@
       <span class="logo-bracket">]</span>
       <span class="logo-sub">ARENA v1.0 // AI SWARM SANDBOX</span>
     </div>
+
+    <div id="mode-tabs">
+      <button id="tab-arcade" class="mode-tab active" title="Play Classic Pac-Man with 3 lives and score">🕹️ ARCADE</button>
+      <button id="tab-duel" class="mode-tab" title="1v1 Duel: You play Blinky hunting the Champion AI">⚔️ 1v1 VS AI</button>
+      <button id="tab-swarm" class="mode-tab" title="Watch 35 Neural Agents evolve in parallel">🔬 SWARM LAB</button>
+    </div>
+
     <div id="header-stats">
       <div class="stat-pill">
-        <span class="stat-label">GEN</span>
-        <span class="stat-value" id="gen-display">001</span>
+        <span class="stat-label" id="stat-1-lbl">SCORE</span>
+        <span class="stat-value" id="gen-display">00000</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label" id="stat-2-lbl">LIVES</span>
+        <span class="stat-value" id="alive-display">🟡 🟡 🟡</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label" id="stat-3-lbl">PELLETS</span>
+        <span class="stat-value" id="best-display">364</span>
       </div>
       <div class="stat-pill">
         <span class="stat-label">FPS</span>
         <span class="stat-value" id="fps-display">--</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">ALIVE</span>
-        <span class="stat-value" id="alive-display">35</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">BEST FIT</span>
-        <span class="stat-value" id="best-display">0.00</span>
       </div>
     </div>
     <div id="header-controls">
@@ -44,6 +51,13 @@
       </button>
       <button id="btn-speed" class="ctrl-btn btn-secondary" title="Toggle fast-forward">
         <span class="btn-icon">&#9193;</span> 1x
+      </button>
+
+      <button id="btn-barrier" class="ctrl-btn btn-accent" title="Maze Architect Mode: Click or Shift+Click to place/remove dynamic neon barriers (Hotkey: B)">
+        <span class="btn-icon">&#129521;</span> BARRIERS (B)
+      </button>
+      <button id="btn-warp" class="ctrl-btn btn-purple" title="Turbo Warp: Evolve 10 generations in pure headless memory">
+        <span class="btn-icon">&#9197;</span> WARP 10G
       </button>
     </div>
   </header>
@@ -122,14 +136,18 @@
             <canvas id="nn-canvas" width="220" height="120"></canvas>
           </div>
           <div class="sensor-grid" id="sensor-grid">
-            <div class="sensor-item"><span class="sensor-dir">UP</span><span class="sensor-val" id="s-up">0</span></div>
-            <div class="sensor-item"><span class="sensor-dir">DN</span><span class="sensor-val" id="s-dn">0</span></div>
-            <div class="sensor-item"><span class="sensor-dir">LT</span><span class="sensor-val" id="s-lt">0</span></div>
-            <div class="sensor-item"><span class="sensor-dir">RT</span><span class="sensor-val" id="s-rt">0</span></div>
-            <div class="sensor-item"><span class="sensor-dir">Gx</span><span class="sensor-val" id="s-gx">0.00</span></div>
-            <div class="sensor-item"><span class="sensor-dir">Gy</span><span class="sensor-val" id="s-gy">0.00</span></div>
-            <div class="sensor-item"><span class="sensor-dir">Px</span><span class="sensor-val" id="s-px">0.00</span></div>
-            <div class="sensor-item"><span class="sensor-dir">Py</span><span class="sensor-val" id="s-py">0.00</span></div>
+            <div class="sensor-item" title="Wall clearance Up"><span class="sensor-dir">W_UP</span><span class="sensor-val" id="s-up">0.0</span></div>
+            <div class="sensor-item" title="Wall clearance Down"><span class="sensor-dir">W_DN</span><span class="sensor-val" id="s-dn">0.0</span></div>
+            <div class="sensor-item" title="Wall clearance Left"><span class="sensor-dir">W_LT</span><span class="sensor-val" id="s-lt">0.0</span></div>
+            <div class="sensor-item" title="Wall clearance Right"><span class="sensor-dir">W_RT</span><span class="sensor-val" id="s-rt">0.0</span></div>
+            <div class="sensor-item" title="Ghost Proximity"><span class="sensor-dir">G_PRX</span><span class="sensor-val" id="s-gprox">0.00</span></div>
+            <div class="sensor-item" title="Ghost Relative Vector X"><span class="sensor-dir">G_VECx</span><span class="sensor-val" id="s-gx">0.00</span></div>
+            <div class="sensor-item" title="Ghost Relative Vector Y"><span class="sensor-dir">G_VECy</span><span class="sensor-val" id="s-gy">0.00</span></div>
+            <div class="sensor-item" title="BFS Pellet Path X"><span class="sensor-dir">P_BFSx</span><span class="sensor-val" id="s-px">0.00</span></div>
+            <div class="sensor-item" title="BFS Pellet Path Y"><span class="sensor-dir">P_BFSy</span><span class="sensor-val" id="s-py">0.00</span></div>
+            <div class="sensor-item" title="Pellet Proximity"><span class="sensor-dir">P_PRX</span><span class="sensor-val" id="s-pprox">0.00</span></div>
+            <div class="sensor-item" title="Current Heading X"><span class="sensor-dir">DIR_X</span><span class="sensor-val" id="s-dirx">0</span></div>
+            <div class="sensor-item" title="Current Heading Y"><span class="sensor-dir">DIR_Y</span><span class="sensor-val" id="s-diry">0</span></div>
           </div>
         </div>
       </div>
@@ -142,9 +160,10 @@
           <div id="overlay-content">
             <div class="overlay-title" id="overlay-title">PAUSED</div>
             <div class="overlay-sub" id="overlay-sub">Press PAUSE to resume</div>
+            <button id="overlay-btn" class="overlay-btn" style="display:none;">RESTART</button>
           </div>
         </div>
-        <div id="canvas-hint">Click any open tile to spawn a Ghost &middot; Space = Pause</div>
+        <div id="canvas-hint">Click = Spawn Ghost &middot; Shift+Click = Wall Barrier &middot; Right-Click = Super Energizer &middot; H = Hunter Mode &middot; Space = Pause</div>
       </div>
     </section>
   </main>

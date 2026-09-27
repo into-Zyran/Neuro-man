@@ -16,14 +16,26 @@ Most AI projects are just cloud API wrappers. Neuro-Pacman Arena is built from s
 
 ---
 
-## 🎮 Core Features
+## 🎮 3 Distinct Game Modes
 
-* 🧠 **Real-Time Swarm Evolution:** 35 active neural networks calculate spatial trajectories simultaneously. The genetic algorithm selects for survival, applies tournament selection, and mutates weights every 10 seconds.
-* 🌌 **Parallel Universe State Isolation:** Agents render on the same canvas but do not cannibalize each other's food. Each agent maintains an independent boolean array for the world state, ensuring fair fitness gradients.
-* 🛡️ **The Validation Shield:** Engine-level intercept that stops neural networks from endlessly running into walls, forcing the math to pick the next best mathematically valid path.
-* 🖱️ **Interactive Judge Mode:** Click anywhere on the live canvas to instantly drop a new Ghost threat and watch the neural swarm dynamically recalculate its evasion vectors on the fly.
-* 💽 **Cold Start Champion:** Boots instantly with a hardcoded, pre-trained JSON weight matrix for an immediate, flawless "smart" demo, with a toggle to watch it learn from scratch.
-* 💻 **Hacker Telemetry Dashboard:** A dark, high-contrast CSS Grid terminal streaming live epoch rollovers, mutation spikes, and target vectors alongside the game canvas.
+Neuro-Pacman Arena features a real-time mode switcher right in the header:
+
+| Mode | What You Experience | Key Objective & Gameplay |
+| :--- | :--- | :--- |
+| **🕹️ ARCADE MODE** | **Classic Playable Pac-Man** | You control Pac-Man with Arrow Keys / WASD. 3 Lives, live score (0–100 max scale), Super Energizers (+10 pts), relentless lethal Ghost hunters, and dual warp tunnels. |
+| **⚔️ 1v1 MAN vs MACHINE** | **Asymmetric Duel** | **YOU play Ghost Blinky**, hunting down the **#1 AI Champion Pac-Man** (1v1). Catch the neural network within 45 seconds before it clears the board! |
+| **🔬 AI SWARM LAB** | **Genetic Algorithm Sandbox** | Watch 35 neural-network-driven Pac-Men evolve across generations. Features dynamic wall barrier architect mode, turbo 10G warp, and real-time neural synapse visualization. |
+
+---
+
+## 🕹️ Interactive Controls
+
+* **Arrow Keys / WASD:** Steer Pac-Man in Arcade mode, or steer Ghost Blinky in Duel / Hunter modes.
+* **Spacebar:** Pause / Resume game loop.
+* **R Key:** Instant restart of the current stage / round.
+* **Shift + Click (or B Key):** Enter **Maze Architect Mode** to drop dynamic neon force barriers and watch pathfinding reroute live.
+* **Right-Click:** Drop a Super Energizer anywhere on an open corridor.
+* **⚡ WARP 10G:** Fast-forwards 10 generations in ~150ms of headless memory.
 
 ---
 
@@ -62,11 +74,22 @@ Double-click `index.html` to open it in any modern web browser.
 
 ## 🧠 Neural Architecture (The Brain)
 
-Each of the 35 agents is powered by a custom 1D-array Feedforward Neural Network using a `Math.tanh` activation function.
+Each of the 35 agents is powered by a high-performance 1D-array Feedforward Neural Network using `Math.tanh` activations with zero GC pressure during the forward pass.
 
-* **Layer 1 (8 Inputs):** 4 Wall Proximity Sensors (Up/Down/Left/Right), 2 Normalized Ghost Vectors (X,Y), 2 Normalized Pellet Vectors (X,Y).
-* **Layer 2 (Hidden):** 6 Active Nodes.
-* **Layer 3 (4 Outputs):** Directional movement probabilities.
-* **Composite Fitness Function:** `(Pellets Eaten * 100) + (Frames Survived * 0.2) - (Repeated Tile Penalty)`
+* **Layer 1 (12 Sensory Inputs):**
+  * 4 Wall Proximity Sensors (Up/Down/Left/Right Raycast Clearances)
+  * 3 Ghost Threat Sensors (Ghost Proximity, Relative $\Delta X$, Relative $\Delta Y$)
+  * 3 Pellet Path Sensors (BFS Shortest Path $\Delta X$, BFS Shortest Path $\Delta Y$, Pellet Proximity)
+  * 2 Momentum/Heading Sensors (Current Velocity $\Delta X$, Velocity $\Delta Y$)
+* **Layer 2 (Hidden):** 10 Active Nodes with Xavier/Glorot initialization.
+* **Layer 3 (4 Outputs):** Directional movement activations (`[UP, DOWN, LEFT, RIGHT]`).
+* **Multi-Elite Genetic Algorithm:** Top 2 champions preserved verbatim; remaining 33 slots bred via 3-way tournament selection, uniform blend crossover, and adaptive Gaussian mutation with entropy shock safeguards against stagnation.
+* **Asymmetrical Ghost AI Personalities:**
+  * 🔴 **Blinky (Red):** Direct aggressive hunter (shortest path tracking).
+  * 🌸 **Pinky (Pink):** Ambush interceptor (targets 3 tiles ahead of leader).
+  * 🔷 **Inky (Cyan):** Flanker / patrol router.
+  * 🍊 **Clyde (Orange):** Cowardly roamer (chases when distant, retreats to scatter corner when close).
+* **Composite Fitness Function:**
+  $$\text{Fitness} = (\text{Pellets} \times 150) + (\text{Unique Tiles Explored} \times 20) + (\text{Frames Survived} \times 0.1) + (\text{Close Evades} \times 10) - \text{Loop Penalty}$$
 
 ---
